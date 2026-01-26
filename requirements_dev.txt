@@ -1,0 +1,13 @@
+# packaging
+pip
+setuptools
+twine
+wheel
+
+# python and debugging
+ipdb
+ipykernel
+
+# data viz
+matplotlib
+seaborn
