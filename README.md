@@ -95,6 +95,14 @@ floportop/
 ├── models/                  # Trained models (TBD)
 └── README.md
 ```
+## Search engine
+
+### How to use
+
+```
+pip install -e .
+python api/movie_search.py "dark sci-fi time travel"
+```
 
 ## Team
 
