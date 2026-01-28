@@ -8,6 +8,7 @@ Endpoints:
 """
 
 from fastapi import FastAPI, HTTPException
+from typing import Optional
 import numpy as np
 
 # Import our package
@@ -51,7 +52,7 @@ def root():
 def predict(
     startYear: int,
     runtimeMinutes: int,
-    numVotes: int,
+    numVotes: Optional[int] = None,
     isAdult: int = 0,
     genres: str = "Drama"
 ):
@@ -61,7 +62,8 @@ def predict(
     Parameters:
     - startYear: Release year (e.g., 2020)
     - runtimeMinutes: Movie length in minutes (e.g., 120)
-    - numVotes: Number of IMDb votes (e.g., 50000)
+    - numVotes: Number of IMDb votes (optional - uses median=85 if not provided).
+                Omit this for new movies that don't have vote data yet.
     - isAdult: Adult content flag (0 or 1, default 0)
     - genres: Comma-separated genres (e.g., "Action,Adventure,Sci-Fi")
 
