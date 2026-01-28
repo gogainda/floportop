@@ -5,9 +5,10 @@ WORKDIR /prod
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
-COPY api api
-
-# This is the line we are fixing inside the file
+# Now copy your local code/models into the image
 COPY floportop floportop
+COPY api api
 COPY models models
-CMD uvicorn api.app:app --host 0.0.0.0 --port $PORT
+
+# Use the JSON format to make Docker happy
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8080"]
