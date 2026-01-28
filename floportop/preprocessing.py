@@ -20,6 +20,12 @@ VALID_GENRES = [
 CURRENT_YEAR = 2026
 RUNTIME_CAP = 300  # minutes
 
+# Median numVotes from training data (see model_v3_jesus.ipynb Section 8)
+# Used for imputation when numVotes is not provided (e.g., predicting new movies)
+# Why median? numVotes is heavily right-skewed; median is robust to outliers
+MEDIAN_NUM_VOTES = 85
+HIT_THRESHOLD = 648  # 80th percentile from training data
+
 
 def load_clean_data(filepath: str = None) -> pd.DataFrame:
     """
@@ -67,6 +73,19 @@ def create_popularity_features(df: pd.DataFrame) -> pd.DataFrame:
     percentile_80 = df['numVotes'].quantile(0.80)
     df['hit'] = (df['numVotes'] >= percentile_80).astype(int)
 
+    return df
+
+
+def create_budget_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add budget features (log transform and binary flag)."""
+    df = df.copy()
+    
+    # Ensure budget is numeric
+    if 'budget' in df.columns:
+        df['budget'] = pd.to_numeric(df['budget'], errors='coerce').fillna(0)
+        df['log_budget'] = np.log1p(df['budget'])
+        df['has_budget'] = (df['budget'] > 0).astype(int)
+    
     return df
 
 
@@ -123,13 +142,22 @@ def preprocess_single_movie(movie_data: dict) -> pd.DataFrame:
     Preprocess a single movie for prediction.
 
     Args:
-        movie_data: Dict with keys: startYear, runtimeMinutes, numVotes,
+        movie_data: Dict with keys: startYear, runtimeMinutes, numVotes (optional),
                     isAdult, genres (comma-separated string)
+
+                    If numVotes is None or not provided, uses MEDIAN_NUM_VOTES.
+                    This handles the case of predicting ratings for new movies
+                    that don't have vote data yet.
 
     Returns:
         DataFrame with one row, ready for model.predict()
     """
     df = pd.DataFrame([movie_data])
+
+    # Handle missing numVotes with median imputation
+    # See model_v3_jesus.ipynb Section 8 for justification
+    if 'numVotes' not in df.columns or df['numVotes'].isna().any() or df['numVotes'].iloc[0] is None:
+        df['numVotes'] = MEDIAN_NUM_VOTES
 
     # Apply transformations
     df['movie_age'] = CURRENT_YEAR - df['startYear']
@@ -138,7 +166,6 @@ def preprocess_single_movie(movie_data: dict) -> pd.DataFrame:
     df['log_numVotes'] = np.log1p(df['numVotes'])
 
     # Hit flag (using threshold from training data)
-    HIT_THRESHOLD = 648  # 80th percentile from training (see eda_feature_engineering.ipynb)
     df['hit'] = (df['numVotes'] >= HIT_THRESHOLD).astype(int)
 
     # Genre count and one-hot encoding
