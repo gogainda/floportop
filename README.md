@@ -95,13 +95,44 @@ floportop/
 ├── models/                  # Trained models (TBD)
 └── README.md
 ```
-## Search engine
+## API
 
-### How to use
+### Running the API
 
-```
+```bash
 pip install -e .
-python api/movie_search.py "dark sci-fi time travel"
+cd api
+uvicorn app:app --reload
+```
+
+The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check |
+| `/predict` | GET | Predict movie rating from metadata |
+| `/similar-film` | GET | Find similar movies by text query |
+
+### Examples
+
+**Predict rating:**
+```bash
+curl "http://localhost:8000/predict?startYear=2024&runtimeMinutes=120&numVotes=50000&genres=Action,Sci-Fi"
+```
+
+**Find similar movies:**
+```bash
+curl "http://localhost:8000/similar-film?query=dark+sci-fi+time+travel&k=5"
+```
+
+Note: The similarity search index is built lazily on the first `/similar-film` call. Subsequent calls use the cached index from `api/cache/`.
+
+## Search engine CLI
+
+```bash
+python -m floportop.movie_search "dark sci-fi time travel"
 ```
 
 ## Team
@@ -113,6 +144,12 @@ python api/movie_search.py "dark sci-fi time travel"
 | Jesús López | Developer |
 | Kyle Thomas | Developer |
 | mucahit TIMAR | Developer |
+
+## 🚀Deployment
+The API is hosted on Google Cloud Run.
+- Production URL: https://floportop-v2-233992317574.europe-west1.run.app/predict
+- Required Inputs: startYear, runtimeMinutes, numVotes.
+- Build Engine: Google Cloud Build (Remote).
 
 ## Le Wagon Data Science & AI Bootcamp
 

@@ -5,11 +5,15 @@ Extracted from notebooks/model_training_v2.ipynb
 """
 
 import pickle
+import warnings
 from pathlib import Path
 from typing import Union
 
 import pandas as pd
 import numpy as np
+
+# Suppress sklearn version mismatch warnings
+warnings.filterwarnings("ignore", message="Trying to unpickle estimator")
 
 from .preprocessing import preprocess_single_movie
 

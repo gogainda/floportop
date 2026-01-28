@@ -2,6 +2,7 @@ import os
 import ast
 import pickle
 import argparse
+import warnings
 
 import kagglehub
 from kagglehub import KaggleDatasetAdapter
@@ -10,15 +11,21 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 
+# Suppress pandas DtypeWarning for mixed-type columns
+warnings.filterwarnings("ignore", message="Columns.*mixed types")
+
 # ======================
 # Config
 # ======================
-CACHE_DIR = "cache"
-MOVIES_PKL = os.path.join(CACHE_DIR, "movies.pkl")
-INDEX_FAISS = os.path.join(CACHE_DIR, "index.faiss")
-MODEL_DIR = os.path.join(CACHE_DIR, "model")
+from pathlib import Path
 
-os.makedirs(CACHE_DIR, exist_ok=True)
+_PROJECT_ROOT = Path(__file__).parent.parent
+CACHE_DIR = _PROJECT_ROOT / "cache"
+MOVIES_PKL = CACHE_DIR / "movies.pkl"
+INDEX_FAISS = CACHE_DIR / "index.faiss"
+MODEL_DIR = CACHE_DIR / "model"
+
+CACHE_DIR.mkdir(exist_ok=True)
 
 # ======================
 # Storage helpers
@@ -29,38 +36,40 @@ def save_pickle(obj, path):
 
 
 def load_pickle(path):
-    if not os.path.exists(path):
+    if not Path(path).exists():
         return None
     with open(path, "rb") as f:
         return pickle.load(f)
 
 
 def save_index(index):
-    faiss.write_index(index, INDEX_FAISS)
+    faiss.write_index(index, str(INDEX_FAISS))
 
 
 def load_index():
-    if not os.path.exists(INDEX_FAISS):
+    if not INDEX_FAISS.exists():
         return None
-    return faiss.read_index(INDEX_FAISS)
+    return faiss.read_index(str(INDEX_FAISS))
 
 
 # ======================
 # Data loading
 # ======================
 def load_csv(file_path):
-    return kagglehub.load_dataset(
+    df = kagglehub.load_dataset(
         KaggleDatasetAdapter.PANDAS,
         "rounakbanik/the-movies-dataset",
         file_path,
     )
+    print(f"   📄 {file_path}: {df.shape[0]:,} rows x {df.shape[1]} cols")
+    return df
 
 
 def load_movie_data(force_reload=False):
     if not force_reload:
         cached = load_pickle(MOVIES_PKL)
         if cached is not None:
-            print("✅ Using cached movies dataframe")
+            print(f"✅ Using cached movies dataframe: {MOVIES_PKL} ({cached.shape[0]:,} rows x {cached.shape[1]} cols)")
             return cached
 
     print("⬇️ Loading Kaggle movie dataset...")
@@ -81,6 +90,7 @@ def load_movie_data(force_reload=False):
         .merge(keywords, on="id", how="left")
         .merge(links, left_on="id", right_on="tmdbId", how="left")
     )
+    print(f"   🔗 Merged dataset: {df.shape[0]:,} rows x {df.shape[1]} cols")
 
     def parse_json(col):
         return col.apply(lambda x: ast.literal_eval(x) if pd.notna(x) else [])
@@ -111,7 +121,6 @@ def load_movie_data(force_reload=False):
     ].reset_index(drop=True)
 
     movies_df["embedding_text"] = (
-        "Title: " + movies_df["title"].fillna("") + "\n"
         "Overview: " + movies_df["overview"].fillna("") + "\n"
         "Genres: " + movies_df["genre_names"].apply(lambda x: ", ".join(x)) + "\n"
         "Keywords: " + movies_df["keyword_names"].apply(lambda x: ", ".join(x)) + "\n"
@@ -119,6 +128,7 @@ def load_movie_data(force_reload=False):
         "Director: " + movies_df["directors"].apply(lambda x: ", ".join(x))
     )
 
+    print(f"   ✂️ Final dataset: {movies_df.shape[0]:,} rows x {movies_df.shape[1]} cols")
     save_pickle(movies_df, MOVIES_PKL)
     print("💾 Cached movies dataframe")
 
@@ -129,12 +139,12 @@ def load_movie_data(force_reload=False):
 # Model / index
 # ======================
 def get_model():
-    if os.path.exists(MODEL_DIR):
-        return SentenceTransformer(MODEL_DIR)
+    if MODEL_DIR.exists():
+        return SentenceTransformer(str(MODEL_DIR))
 
     print("🧠 Downloading sentence transformer model...")
     model = SentenceTransformer("all-MiniLM-L6-v2")
-    model.save(MODEL_DIR)
+    model.save(str(MODEL_DIR))
     return model
 
 
