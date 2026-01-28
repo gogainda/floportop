@@ -114,6 +114,12 @@ python api/movie_search.py "dark sci-fi time travel"
 | Kyle Thomas | Developer |
 | mucahit TIMAR | Developer |
 
+## 🚀Deployment
+The API is hosted on Google Cloud Run.
+- Production URL: https://floportop-v2-233992317574.europe-west1.run.app/predict
+- Required Inputs: startYear, runtimeMinutes, numVotes.
+- Build Engine: Google Cloud Build (Remote).
+
 ## Le Wagon Data Science & AI Bootcamp
 
 Final project for [Le Wagon](https://www.lewagon.com/) Batch #2201 (2025)
