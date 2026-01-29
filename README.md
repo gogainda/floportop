@@ -23,7 +23,7 @@ All inputs are available before release — making predictions realistic and use
 | Dataset | Purpose | Key Features |
 |---------|---------|--------------|
 | [IMDb Dataset](https://www.kaggle.com/datasets/ashirwadsangwan/imdb-dataset) | Core Training Labels | Year, runtime, genres, IMDb score/votes |
-| [TMDB Movies Dataset](https://www.kaggle.com/datasets/tmdb/tmdb-movie-metadata) | NLP Features | Plot overview, tagline, keywords, credits |
+| [TMDB Movies Dataset](https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset) | NLP Features | Plot overview, budget, revenue, credits |
 
 ## Model Inputs
 
@@ -81,18 +81,19 @@ All inputs are available before release — making predictions realistic and use
 
 ```
 floportop/
-├── data/                    # IMDb & TMDB datasets (not tracked in git)
-│   ├── title.basics.tsv
-│   ├── title.ratings.tsv
-│   └── ...
-├── notebooks/               # Individual exploration notebooks
-│   ├── notebook_ben.ipynb
-│   ├── notebook_igor.ipynb
-│   ├── notebook_jesus.ipynb
-│   ├── notebook_kyle.ipynb
-│   └── notebook_mucahit.ipynb
-├── src/                     # Source code (TBD)
-├── models/                  # Trained models (TBD)
+├── data/                    # Datasets (not tracked in git)
+│   ├── raw/                 # Original Kaggle files (IMDb + TMDB)
+│   ├── processed/           # Clean merged datasets
+│   ├── embeddings/          # Plot embeddings
+│   └── v1/                  # Legacy intermediate files
+├── notebooks/
+│   ├── jesus/               # Main data pipeline
+│   │   ├── data_pipeline.ipynb        # IMDb + TMDB cleaning & merging
+│   │   ├── feature_engineering.ipynb  # Feature creation for modeling
+│   │   └── v1/              # Previous notebook versions
+│   └── ...                  # Other team members' notebooks
+├── src/                     # Source code
+├── models/                  # Trained models
 └── README.md
 ```
 ## API
