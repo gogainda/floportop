@@ -1,217 +1,310 @@
-import os
-import ast
-import pickle
-import argparse
-import warnings
+"""
+Simplified Movie Recommendation Engine - Pure Script Version
+"""
 
-import kagglehub
-from kagglehub import KaggleDatasetAdapter
+import pickle
+import warnings
+import argparse
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
+from kaggle.api.kaggle_api_extended import KaggleApi
 
-# Suppress pandas DtypeWarning for mixed-type columns
 warnings.filterwarnings("ignore", message="Columns.*mixed types")
 
-# ======================
-# Config
-# ======================
-from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).parent.parent
-CACHE_DIR = _PROJECT_ROOT / "cache"
+# ============================================================================
+# Configuration
+# ============================================================================
+
+PROJECT_ROOT = Path(__file__).parent.parent
+
+CACHE_DIR = PROJECT_ROOT / "cache"
+DATA_DIR = PROJECT_ROOT / "data"
+MODELS_DIR = PROJECT_ROOT / "models"
+
 MOVIES_PKL = CACHE_DIR / "movies.pkl"
-INDEX_FAISS = CACHE_DIR / "index.faiss"
+INDEX_FAISS = MODELS_DIR / "index.faiss"
+
 MODEL_DIR = CACHE_DIR / "model"
 
+KAGGLE_DATASET = "rounakbanik/the-movies-dataset"
+MODEL_NAME = "BAAI/bge-base-en-v1.5"
+
 CACHE_DIR.mkdir(exist_ok=True)
-
-# ======================
-# Storage helpers
-# ======================
-def save_pickle(obj, path):
-    with open(path, "wb") as f:
-        pickle.dump(obj, f)
+DATA_DIR.mkdir(exist_ok=True)
 
 
-def load_pickle(path):
-    if not Path(path).exists():
-        return None
-    with open(path, "rb") as f:
-        return pickle.load(f)
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+def download_dataset():
+    """Download Kaggle dataset if needed"""
+    required_files = {"movies_metadata.csv", "credits.csv", "keywords.csv", "links.csv"}
+    existing_files = {f.name for f in DATA_DIR.iterdir()}
+
+    if required_files.issubset(existing_files):
+        print("✅ Dataset already downloaded")
+        return
+
+    print("⬇️ Downloading dataset...")
+    api = KaggleApi()
+    api.authenticate()
+    api.dataset_download_files(KAGGLE_DATASET, path=str(DATA_DIR), unzip=True)
+    print("✅ Download complete")
 
 
-def save_index(index):
-    faiss.write_index(index, str(INDEX_FAISS))
-
-
-def load_index():
-    if not INDEX_FAISS.exists():
-        return None
-    return faiss.read_index(str(INDEX_FAISS))
-
-
-# ======================
-# Data loading
-# ======================
-def load_csv(file_path):
-    df = kagglehub.load_dataset(
-        KaggleDatasetAdapter.PANDAS,
-        "rounakbanik/the-movies-dataset",
-        file_path,
-    )
-    print(f"   📄 {file_path}: {df.shape[0]:,} rows x {df.shape[1]} cols")
+def load_csv(filename):
+    """Load CSV and print basic info"""
+    path = DATA_DIR / filename
+    df = pd.read_csv(path, low_memory=False)
+    print(f"   📄 {filename}: {len(df):,} rows")
     return df
 
 
-def load_movie_data(force_reload=False):
-    if not force_reload:
-        cached = load_pickle(MOVIES_PKL)
-        if cached is not None:
-            print(f"✅ Using cached movies dataframe: {MOVIES_PKL} ({cached.shape[0]:,} rows x {cached.shape[1]} cols)")
-            return cached
+def parse_json_column(value):
+    """Safely parse JSON strings to Python objects"""
+    if isinstance(value, str):
+        try:
+            import ast
+            return ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            return []
+    return value if isinstance(value, (list, dict)) else []
 
-    print("⬇️ Loading Kaggle movie dataset...")
 
+def extract_names(items, key="name"):
+    """Extract name field from list of dicts"""
+    return [item.get(key, "") for item in items if isinstance(item, dict)]
+
+
+def join_list(lst):
+    """Join list into comma-separated string"""
+    return ", ".join(map(str, lst)) if isinstance(lst, list) else str(lst)
+
+
+def merge_plot_arcs(df):
+    """Merge plot arc data from parquet file"""
+    plot_arc_path = PROJECT_ROOT / "models" / "wide_df_with_plot_arc.parquet"
+
+    if not plot_arc_path.exists():
+        print("⚠️  Plot arc file not found, skipping plot arcs")
+        df["plot_arc"] = ""
+        return df
+
+    # Normalize IMDb ID column name
+    if "imdb_id" in df.columns:
+        df = df.assign(tconst=df["imdb_id"])
+    elif "imdbId" in df.columns:
+        df = df.assign(tconst=df["imdbId"])
+    else:
+        print("⚠️  No IMDb ID column found, skipping plot arcs")
+        df["plot_arc"] = ""
+        return df
+
+    # Load and merge plot arcs
+    df_plot = (
+        pd.read_parquet(plot_arc_path, engine="fastparquet")
+        .rename(columns={"imdbId": "tconst"})
+        [["tconst", "plot_arc"]]
+        .dropna(subset=["plot_arc"])
+    )
+
+    df = df.merge(df_plot, on="tconst", how="left").fillna({"plot_arc": ""})
+    df = df.drop(columns=["tconst"])
+
+    print(f"   🎭 Merged plot arcs for {df['plot_arc'].astype(bool).sum():,} movies")
+    return df
+
+
+def create_embedding_text(row):
+    """Create searchable text from movie features"""
+    return "\n".join([
+        f"Overview: {row.get('overview', '')}",
+        f"Genres: {join_list(row.get('genre_names', []))}",
+        f"Keywords: {join_list(row.get('keyword_names', []))}",
+        f"Plot Arc: {row.get('plot_arc', '')}",
+        f"Cast: {join_list(row.get('cast_top', []))}",
+        f"Director: {join_list(row.get('directors', []))}"
+    ])
+
+
+# ============================================================================
+# Data Loading
+# ============================================================================
+
+def load_movie_data(force_rebuild=False):
+    """Load or build movie dataset"""
+
+    # Try loading from cache
+    if not force_rebuild and MOVIES_PKL.exists():
+        with open(MOVIES_PKL, "rb") as f:
+            movies_df = pickle.load(f)
+        print(f"✅ Loaded cached data: {len(movies_df):,} movies")
+        return movies_df
+
+    # Build from scratch
+    print("📦 Building movie dataset...")
+    download_dataset()
+
+    # Load raw data
     movies = load_csv("movies_metadata.csv")
     credits = load_csv("credits.csv")
     keywords = load_csv("keywords.csv")
     links = load_csv("links.csv")
 
-    movies = movies[movies["id"].str.isnumeric()]
+    # Clean IDs
+    movies = movies[movies["id"].str.isnumeric()].copy()
     movies["id"] = movies["id"].astype(int)
     credits["id"] = credits["id"].astype(int)
     keywords["id"] = keywords["id"].astype(int)
     links["imdbId"] = links["imdbId"].apply(lambda x: f"tt{x:07d}")
 
+    # Merge datasets
     df = (
-        movies.merge(credits, on="id", how="left")
+        movies
+        .merge(credits, on="id", how="left")
         .merge(keywords, on="id", how="left")
         .merge(links, left_on="id", right_on="tmdbId", how="left")
     )
-    print(f"   🔗 Merged dataset: {df.shape[0]:,} rows x {df.shape[1]} cols")
 
-    def parse_json(col):
-        return col.apply(lambda x: ast.literal_eval(x) if pd.notna(x) else [])
+    # Merge plot arcs
+    df = merge_plot_arcs(df)
 
+    # Parse JSON columns
     for col in ["genres", "keywords", "cast", "crew"]:
-        df[col] = parse_json(df[col])
+        df[col] = df[col].apply(parse_json_column)
 
-    df["genre_names"] = df["genres"].apply(lambda xs: [x["name"] for x in xs])
-    df["keyword_names"] = df["keywords"].apply(lambda xs: [x["name"] for x in xs])
-    df["cast_top"] = df["cast"].apply(lambda xs: [x["name"] for x in xs[:10]])
+    # Extract features
+    df["genre_names"] = df["genres"].apply(extract_names)
+    df["keyword_names"] = df["keywords"].apply(extract_names)
+    df["cast_top"] = df["cast"].apply(lambda x: extract_names(x[:10]))
     df["directors"] = df["crew"].apply(
-        lambda xs: [x["name"] for x in xs if x["job"] == "Director"]
+        lambda x: [item["name"] for item in x if item.get("job") == "Director"]
     )
 
-    movies_df = df[
-        [
-            "id",
-            "imdbId",
-            "title",
-            "overview",
-            "genre_names",
-            "keyword_names",
-            "cast_top",
-            "directors",
-            "vote_average",
-            "vote_count",
-        ]
-    ].reset_index(drop=True)
+    # Extract year from release_date
+    df["year"] = pd.to_datetime(df["release_date"], errors="coerce").dt.year
 
-    movies_df["embedding_text"] = (
-        "Overview: " + movies_df["overview"].fillna("") + "\n"
-        "Genres: " + movies_df["genre_names"].apply(lambda x: ", ".join(x)) + "\n"
-        "Keywords: " + movies_df["keyword_names"].apply(lambda x: ", ".join(x)) + "\n"
-        "Cast: " + movies_df["cast_top"].apply(lambda x: ", ".join(x)) + "\n"
-        "Director: " + movies_df["directors"].apply(lambda x: ", ".join(x))
-    )
+    # Select final columns
+    movies_df = df[[
+        "id", "imdbId", "title", "year", "overview",
+        "genre_names", "keyword_names", "cast_top", "directors",
+        "vote_average", "vote_count", "plot_arc"
+    ]].copy()
 
-    print(f"   ✂️ Final dataset: {movies_df.shape[0]:,} rows x {movies_df.shape[1]} cols")
-    save_pickle(movies_df, MOVIES_PKL)
-    print("💾 Cached movies dataframe")
+    # Create embedding text
+    movies_df["embedding_text"] = movies_df.apply(create_embedding_text, axis=1)
+
+    print(f"✅ Built dataset: {len(movies_df):,} movies")
+
+    # Save to cache
+    with open(MOVIES_PKL, "wb") as f:
+        pickle.dump(movies_df, f)
 
     return movies_df
 
 
-# ======================
-# Model / index
-# ======================
-def get_model():
+# ============================================================================
+# Model & Index
+# ============================================================================
+
+def load_model():
+    """Load or download embedding model"""
     if MODEL_DIR.exists():
         return SentenceTransformer(str(MODEL_DIR))
 
-    print("🧠 Downloading sentence transformer model...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    print("🧠 Downloading embedding model...")
+    model = SentenceTransformer(MODEL_NAME)
     model.save(str(MODEL_DIR))
     return model
 
 
 def build_index(movies_df):
-    print("🔨 Building embeddings + FAISS index...")
+    """Build FAISS search index, 1 hour usually"""
+    print("🔨 Building search index...")
 
-    model = get_model()
+    model = load_model()
     embeddings = model.encode(
         movies_df["embedding_text"].tolist(),
         batch_size=64,
         show_progress_bar=True,
-        normalize_embeddings=True,
+        normalize_embeddings=True
     ).astype("float32")
 
     index = faiss.IndexFlatIP(embeddings.shape[1])
     index.add(embeddings)
 
-    save_index(index)
-    print(f"✅ Index built with {index.ntotal} vectors")
+    faiss.write_index(index, str(INDEX_FAISS))
+    print(f"✅ Index built: {index.ntotal:,} movies")
 
     return index
 
 
-def ensure_index():
-    movies_df = load_movie_data()
-    index = load_index()
+def load_index():
+    """Load cached FAISS index"""
+    if not INDEX_FAISS.exists():
+        return None
+    return faiss.read_index(str(INDEX_FAISS))
 
-    if index is None:
+
+# ============================================================================
+# Search
+# ============================================================================
+
+def search(query, k=10, force_rebuild=False):
+    """Search for movies matching query"""
+
+    # Load data
+    movies_df = load_movie_data(force_rebuild)
+
+    # Load or build index
+    if force_rebuild or not INDEX_FAISS.exists():
         index = build_index(movies_df)
     else:
-        print("⚡ Using cached FAISS index")
+        index = load_index()
+        print("⚡ Loaded cached index")
 
-    return movies_df, index
+    # Load model and encode query
+    model = load_model()
+    query_embedding = model.encode([query], normalize_embeddings=True).astype("float32")
 
+    # Search
+    scores, indices = index.search(query_embedding, k)
 
-# ======================
-# Search
-# ======================
-def search(query, k=10):
-    movies_df, index = ensure_index()
-    model = get_model()
-
-    q_emb = model.encode([query], normalize_embeddings=True).astype("float32")
-    scores, idxs = index.search(q_emb, k)
-
-    results = movies_df.iloc[idxs[0]].copy()
+    # Return results
+    results = movies_df.iloc[indices[0]].copy()
     results["score"] = scores[0]
+
     return results
 
 
-# ======================
+# ============================================================================
 # CLI
-# ======================
+# ============================================================================
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Movie Recommendation Engine")
     parser.add_argument("query", type=str, help="Search query")
-    parser.add_argument("--k", type=int, default=10)
-    parser.add_argument("--rebuild", action="store_true")
+    parser.add_argument("--k", type=int, default=10, help="Number of results")
+    parser.add_argument("--rebuild", action="store_true", help="Rebuild cache")
 
     args = parser.parse_args()
 
-    if args.rebuild:
-        load_movie_data(force_reload=True)
-        build_index(load_pickle(MOVIES_PKL))
+    # Search
+    results = search(args.query, args.k, args.rebuild)
 
-    results = search(args.query, args.k)
+    # Display results
+    print(f"\n🎬 Top {args.k} results for '{args.query}':\n")
+    for i, (_, movie) in enumerate(results.iterrows(), 1):
+        year = f"({int(movie['year'])})" if pd.notna(movie['year']) else ""
+        overview = movie['overview'][:150] + "..." if len(str(movie['overview'])) > 150 else movie['overview']
 
-    print("\n🎬 Top results:\n")
-    for _, row in results.iterrows():
-        print(f"{row['title']}  (score={row['score']:.3f})")
+        print(f"{i}. {movie['title']} {year}")
+        print(f"   Score: {movie['score']:.3f}")
+        print(f"   {overview}")
+        print()
