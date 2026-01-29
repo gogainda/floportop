@@ -18,6 +18,7 @@ charset-normalizer==3.4.4
 click==8.3.1
 comm==0.2.3
 contourpy==1.3.2
+cramjam==2.11.0
 cryptography==46.0.3
 cuda-bindings==12.9.4
 cuda-pathfinder==1.3.3
@@ -32,6 +33,7 @@ executing==2.2.1
 faiss-cpu==1.13.2
 fastapi==0.128.0
 fastjsonschema==2.21.2
+fastparquet==2025.12.0
 filelock==3.20.3
 #floportop==0.0.1
 fonttools==4.61.1
@@ -71,8 +73,7 @@ jupyter_server_terminals==0.5.4
 jupyterlab==4.5.3
 jupyterlab_pygments==0.3.0
 jupyterlab_server==2.28.0
-kagglehub==0.4.1
-kagglesdk==0.1.15
+kaggle==1.7.4.5
 keyring==25.7.0
 kiwisolver==1.4.9
 lark==1.3.1
@@ -123,6 +124,7 @@ protobuf==6.33.4
 psutil==7.2.1
 ptyprocess==0.7.0
 pure_eval==0.2.3
+pyarrow==23.0.0
 pycparser==3.0
 pydantic==2.12.5
 pydantic_core==2.41.5
@@ -131,7 +133,9 @@ pylint==4.0.4
 pyparsing==3.3.2
 pytest==9.0.2
 python-dateutil==2.9.0.post0
+python-dotenv==1.2.1
 python-json-logger==4.0.0
+python-slugify==8.0.4
 pytz==2025.2
 PyYAML==6.0.3
 pyzmq==27.1.0
@@ -147,7 +151,7 @@ rfc3987-syntax==1.1.0
 rich==14.3.1
 rpds-py==0.30.0
 safetensors==0.7.0
-scikit-learn==1.6.1  # DO NOT UPGRADE: Matches Model v2 pickle version
+scikit-learn==1.6.1 # DO NOT UPGRADE: Matches Model v2 pickle version
 scipy==1.15.3
 seaborn==0.13.2
 SecretStorage==3.5.0
@@ -160,6 +164,7 @@ stack-data==0.6.3
 starlette==0.50.0
 sympy==1.14.0
 terminado==0.18.1
+text-unidecode==1.3
 threadpoolctl==3.6.0
 tinycss2==1.4.0
 tokenizers==0.22.2
