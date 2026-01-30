@@ -11,104 +11,6 @@ Endpoints:
 from fastapi import FastAPI, HTTPException
 from typing import Optional
 import numpy as np
-
-
-# Import our package
-import sys
-from pathlib import Path
-
-# Add parent directory to path so we can import floportop package
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from floportop import predict_movie, load_model
-from floportop.movie_search import INDEX_FAISS, load_movie_data, build_index, load_index, load_model as load_similarity_model
-
-
-app = FastAPI(
-    title="Floportop API",
-    description="Predict IMDb movie ratings using machine learning",
-    version="2.0.0"
-)
-
-# Global cache for movie search
-_movies_df = None
-_search_index = None
-_search_model = None
-
-# Load prediction model on startup (caches it for faster predictions)
-@app.on_event("startup")
-def startup_event():
-    try:
-        load_model()
-        print("✅ Prediction model loaded and ready")
-    except Exception as e:
-        print(f"⚠️ Prediction model failed to load: {e}")
-
-
-@app.get("/")
-def root():
-    """Health check endpoint."""
-    return {"status": "online", "model_version": "v2"}
-
-
-@app.get("/predict")
-def predict(
-    startYear: int,
-    runtimeMinutes: int,
-    numVotes: Optional[int] = None,
-    isAdult: int = 0,
-    genres: str = "Drama"
-):
-    """
-    Predict the rating for a movie.
-
-    Parameters:
-    - startYear: Release year (e.g., 2020)
-    - runtimeMinutes: Movie length in minutes (e.g., 120)
-    - numVotes: Number of IMDb votes (optional - uses median=85 if not provided).
-                Omit this for new movies that don't have vote data yet.
-    - isAdult: Adult content flag (0 or 1, default 0)
-    - genres: Comma-separated genres (e.g., "Action,Adventure,Sci-Fi")
-
-    Returns:
-    - predicted_rating: Predicted IMDb rating (1-10 scale)
-    """
-    try:
-        rating = predict_movie({
-            "startYear": startYear,
-            "runtimeMinutes": runtimeMinutes,
-            "numVotes": numVotes,
-            "isAdult": isAdult,
-            "genres": genres
-        })
-
-        return {
-            "predicted_rating": round(rating, 2),
-            "input": {
-                "startYear": startYear,
-                "runtimeMinutes": runtimeMinutes,
-                "numVotes": numVotes,
-                "isAdult": isAdult,
-                "genres": genres
-            }
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
-
-
-"""
-Floportop API - Movie Rating Prediction
-
-Endpoints:
-- GET /              : Health check
-- GET /predict       : Predict movie rating
-- GET /similar-film  : Find similar movies by text query
-- POST /rebuild-index : Rebuild the search index
-"""
-
-from fastapi import FastAPI, HTTPException
-from typing import Optional
 import sys
 from pathlib import Path
 
@@ -122,7 +24,7 @@ from floportop.movie_search import load_movie_data, build_index, load_index, loa
 app = FastAPI(
     title="Floportop API",
     description="Predict IMDb movie ratings using machine learning",
-    version="2.0.0"
+    version="5.0.0"
 )
 
 
@@ -131,7 +33,7 @@ def startup_event():
     """Load prediction model on startup."""
     try:
         load_model()
-        print("✅ Prediction model loaded and ready")
+        print("✅ Prediction model v5 loaded and ready")
     except Exception as e:
         print(f"⚠️ Prediction model failed to load: {e}")
 
@@ -139,50 +41,64 @@ def startup_event():
 @app.get("/")
 def root():
     """Health check endpoint."""
-    return {"status": "online", "model_version": "v2"}
+    return {"status": "online", "model_version": "v5"}
 
 
 @app.get("/predict")
 def predict(
     startYear: int,
     runtimeMinutes: int,
-    numVotes: Optional[int] = None,
+    overview: str,
     isAdult: int = 0,
-    genres: str = "Drama"
+    genres: str = "Drama",
+    budget: Optional[float] = None
 ):
     """
     Predict the rating for a movie.
 
     Parameters:
-    - startYear: Release year (e.g., 2020)
+    - startYear: Release year (e.g., 2024)
     - runtimeMinutes: Movie length in minutes (e.g., 120)
-    - numVotes: Number of IMDb votes (optional - uses median=85 if not provided)
+    - overview: Plot description (REQUIRED). Used for semantic analysis.
     - isAdult: Adult content flag (0 or 1, default 0)
     - genres: Comma-separated genres (e.g., "Action,Adventure,Sci-Fi")
+    - budget: Production budget in dollars (optional, will be imputed if not provided)
 
     Returns:
     - predicted_rating: Predicted IMDb rating (1-10 scale)
+
+    Example:
+    /predict?startYear=2024&runtimeMinutes=148&genres=Action,Sci-Fi&overview=A team of astronauts...
     """
+    if not overview or not overview.strip():
+        raise HTTPException(status_code=400, detail="overview is required and cannot be empty")
+
     try:
-        rating = predict_movie({
-            "startYear": startYear,
-            "runtimeMinutes": runtimeMinutes,
-            "numVotes": numVotes,
-            "isAdult": isAdult,
-            "genres": genres
-        })
+        rating = predict_movie(
+            movie_data={
+                "startYear": startYear,
+                "runtimeMinutes": runtimeMinutes,
+                "isAdult": isAdult,
+                "genres": genres
+            },
+            overview=overview,
+            budget=budget
+        )
 
         return {
             "predicted_rating": round(rating, 2),
             "input": {
                 "startYear": startYear,
                 "runtimeMinutes": runtimeMinutes,
-                "numVotes": numVotes,
+                "overview": overview[:100] + "..." if len(overview) > 100 else overview,
                 "isAdult": isAdult,
-                "genres": genres
+                "genres": genres,
+                "budget": budget
             }
         }
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
