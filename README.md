@@ -120,6 +120,55 @@ The API is hosted on Google Cloud Run.
 - Required Inputs: startYear, runtimeMinutes, numVotes.
 - Build Engine: Google Cloud Build (Remote).
 
+## 🚀 Deployment & Operations Guide
+
+### 1. Prerequisites & Container Engine
+* **Project ID:** `wagon-bootcamp-479218`
+* **Region:** `europe-west1`
+* **Engine:** Use **OrbStack** (recommended for Mac) or **Docker Desktop**.
+* **Note:** OrbStack is a lightweight, drop-in replacement that uses the same `docker` commands but with better performance on Apple Silicon.
+
+---
+
+### 2. Architecture & Platform Fix
+**Critical:** Google Cloud Run requires **`linux/amd64`** images.
+
+* **The Issue:** Apple Silicon Macs (M1/M2/M3) build `arm64` images by default.
+* **The Fix:**
+
+* **Option A**  Use **Remote Builds**. By running `gcloud builds submit`, the image is built natively on Google’s `amd64` servers, bypassing local architecture mismatches.
+
+ * **Option B** Manual Local AMD64 Build
+If you must build locally using OrbStack or Docker, explicitly force the AMD64 platform flag:
+'bash
+docker build --platform linux/amd64 -t gcr.io/wagon-bootcamp-479218/floportop-v2 .
+
+### 3. Deployment Commands
+| Task | Command | Description |
+| :--- | :--- | :--- |
+| **Build & Push** | `make gcp_build` | Remote build on GCP; ensures `amd64` compatibility. |
+| **Live Deploy** | `make gcp_deploy` | Launches the latest image to the public Cloud Run URL. |
+| **Full Ship** | `make gcp_ship` | Runs both build and deploy in one sequence. |
+
+---
+
+### 4. Monitoring & App Access
+
+* **App URL:** `https://floportop-v2-233992317574.europe-west1.run.app/predict`
+* **Documentation:** Append `/docs` to the URL for the interactive Swagger UI.
+* **Logs:** View live server logs in the terminal:
+  ```bash
+  gcloud run services logs read floportop-v2 --region europe-west1
+
+### 5. Troubleshooting
+If the app deploys but the logs show exec user process caused "exec format error", you have pushed an arm64 image instead of amd64.
+
+* **App URL:** `https://floportop-v2-233992317574.europe-west1.run.app/predict`
+* **Documentation:** Append `/docs` to the URL for the interactive Swagger UI.
+
+* **Logs:** View live server logs in the terminal:
+
+
 ## Le Wagon Data Science & AI Bootcamp
 
 Final project for [Le Wagon](https://www.lewagon.com/) Batch #2201 (2025)
