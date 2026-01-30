@@ -8,6 +8,7 @@ Endpoints:
 - POST /rebuild-index : Rebuild the search index
 """
 
+import pickle
 from fastapi import FastAPI, HTTPException
 from typing import Optional
 import numpy as np
@@ -252,6 +253,7 @@ def rebuild_index():
     Returns:
     - status: Success message with index stats
     """
+
     try:
         print("🔨 Building search index...")
 
