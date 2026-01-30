@@ -10,6 +10,9 @@ Endpoints:
 
 from fastapi import FastAPI, HTTPException
 from typing import Optional
+
+
+# Import our package
 import numpy as np
 import sys
 from pathlib import Path
@@ -168,6 +171,7 @@ def rebuild_index():
     Returns:
     - status: Success message with index stats
     """
+
     try:
         print("🔨 Building search index...")
 
