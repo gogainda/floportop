@@ -8,10 +8,8 @@ Endpoints:
 - POST /rebuild-index : Rebuild the search index
 """
 
-import pickle
 from fastapi import FastAPI, HTTPException
 from typing import Optional
-import numpy as np
 
 
 # Import our package
@@ -31,10 +29,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Global cache for movie search
-_movies_df = None
-_search_index = None
-_search_model = None
 
 # Load prediction model on startup (caches it for faster predictions)
 @app.on_event("startup")
