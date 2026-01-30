@@ -1,13 +1,13 @@
 """
 Model loading and prediction functions.
 
-Extracted from notebooks/model_training_v2.ipynb
+Model v5: Uses PCA embeddings from overview, optional budget, no vote features.
 """
 
 import pickle
 import warnings
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
 import pandas as pd
 import numpy as np
@@ -18,8 +18,8 @@ warnings.filterwarnings("ignore", message="Trying to unpickle estimator")
 from .preprocessing import preprocess_single_movie
 
 
-# Default model path
-DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models" / "model_v2.pkl"
+# Default model path (v5)
+DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models" / "model_v5.pkl"
 
 # Cache for loaded model
 _model_cache = {}
@@ -30,10 +30,10 @@ def load_model(model_path: str = None):
     Load the trained model from disk.
 
     Args:
-        model_path: Path to the .pkl file. If None, uses default model.
+        model_path: Path to the .pkl file. If None, uses default model (v5).
 
     Returns:
-        Trained sklearn pipeline.
+        Trained sklearn model (GradientBoostingRegressor).
     """
     if model_path is None:
         model_path = DEFAULT_MODEL_PATH
@@ -56,8 +56,7 @@ def predict(features: pd.DataFrame, model=None) -> np.ndarray:
     Make predictions using the trained model.
 
     Args:
-        features: DataFrame with preprocessed features (from preprocess_features
-                  or preprocess_single_movie)
+        features: DataFrame with preprocessed features (from preprocess_single_movie)
         model: Trained model. If None, loads default model.
 
     Returns:
@@ -70,36 +69,51 @@ def predict(features: pd.DataFrame, model=None) -> np.ndarray:
     return predictions
 
 
-def predict_movie(movie_data: dict, model=None) -> float:
+def predict_movie(
+    movie_data: dict,
+    overview: str,
+    budget: Optional[float] = None,
+    model=None
+) -> float:
     """
     Predict rating for a single movie.
 
     Args:
         movie_data: Dict with movie attributes:
-            - startYear: int (e.g., 2020)
+            - startYear: int (e.g., 2024)
             - runtimeMinutes: int (e.g., 120)
-            - numVotes: int (e.g., 5000)
             - isAdult: int (0 or 1)
             - genres: str (e.g., "Action,Adventure,Sci-Fi")
+        overview: Movie plot description (REQUIRED, non-empty string).
+                  This is used to generate semantic features via embeddings.
+        budget: Production budget in dollars (optional).
+                If not provided, will be imputed based on decade.
+        model: Pre-loaded model (optional, for efficiency in batch calls)
 
     Returns:
         Predicted rating (float between 1-10)
 
+    Raises:
+        ValueError: If overview is empty or None
+
     Example:
-        >>> predict_movie({
-        ...     "startYear": 2020,
-        ...     "runtimeMinutes": 148,
-        ...     "numVotes": 500000,
-        ...     "isAdult": 0,
-        ...     "genres": "Action,Adventure,Sci-Fi"
-        ... })
+        >>> predict_movie(
+        ...     movie_data={
+        ...         "startYear": 2024,
+        ...         "runtimeMinutes": 148,
+        ...         "isAdult": 0,
+        ...         "genres": "Action,Adventure,Sci-Fi"
+        ...     },
+        ...     overview="A team of astronauts embarks on a dangerous mission...",
+        ...     budget=200_000_000
+        ... )
         7.23
     """
     if model is None:
         model = load_model()
 
-    # Preprocess the input
-    features = preprocess_single_movie(movie_data)
+    # Preprocess the input (includes overview embedding and budget imputation)
+    features = preprocess_single_movie(movie_data, overview, budget)
 
     # Predict
     prediction = model.predict(features)[0]
