@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
-from kaggle.api.kaggle_api_extended import KaggleApi
+
 
 warnings.filterwarnings("ignore", message="Columns.*mixed types")
 
@@ -52,6 +52,7 @@ def download_dataset():
         return
 
     print("⬇️ Downloading dataset...")
+    from kaggle.api.kaggle_api_extended import KaggleApi
     api = KaggleApi()
     api.authenticate()
     api.dataset_download_files(KAGGLE_DATASET, path=str(DATA_DIR), unzip=True)
