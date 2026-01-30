@@ -26,7 +26,7 @@ CACHE_DIR = PROJECT_ROOT / "cache"
 DATA_DIR = PROJECT_ROOT / "data"
 MODELS_DIR = PROJECT_ROOT / "models"
 
-MOVIES_PKL = CACHE_DIR / "movies.pkl"
+MOVIES_PKL = MODELS_DIR / "movies.pkl"
 INDEX_FAISS = MODELS_DIR / "index.faiss"
 
 MODEL_DIR = CACHE_DIR / "model"
