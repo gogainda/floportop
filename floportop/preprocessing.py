@@ -1,13 +1,22 @@
 """
 Feature engineering and preprocessing functions.
 
-Extracted from notebooks/eda_feature_engineering.ipynb
+Model v5: Uses PCA embeddings from overview, optional budget, no vote features.
 """
 
+import json
+import pickle
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from functools import lru_cache
 
+
+# Constants
+CURRENT_YEAR = 2026
+RUNTIME_CAP = 300  # minutes
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+N_PCA_COMPONENTS = 20
 
 # Genres that passed the 1000 occurrence threshold
 VALID_GENRES = [
@@ -17,15 +26,171 @@ VALID_GENRES = [
     'Animation', 'Western', 'Sport', 'Adult'
 ]
 
-CURRENT_YEAR = 2026
-RUNTIME_CAP = 300  # minutes
+# PCA column names
+PCA_COLS = [f"pca_{i}" for i in range(N_PCA_COMPONENTS)]
 
-# Median numVotes from training data (see model_v3_jesus.ipynb Section 8)
-# Used for imputation when numVotes is not provided (e.g., predicting new movies)
-# Why median? numVotes is heavily right-skewed; median is robust to outliers
-MEDIAN_NUM_VOTES = 85
-HIT_THRESHOLD = 648  # 80th percentile from training data
+# Final feature order for model v5 (49 features)
+FEATURE_ORDER_V5 = [
+    # IMDb Core (5 features)
+    "movie_age", "decade", "runtimeMinutes_capped", "genre_count", "isAdult",
+    # Genres (22 features)
+    "Genre_Drama", "Genre_Comedy", "Genre_Documentary", "Genre_Romance",
+    "Genre_Action", "Genre_Crime", "Genre_Thriller", "Genre_Horror",
+    "Genre_Adventure", "Genre_Mystery", "Genre_Family", "Genre_Biography",
+    "Genre_Fantasy", "Genre_History", "Genre_Music", "Genre_Sci-Fi",
+    "Genre_Musical", "Genre_War", "Genre_Animation", "Genre_Western",
+    "Genre_Sport", "Genre_Adult",
+    # PCA Embeddings (20 features)
+] + PCA_COLS + [
+    # Budget (2 features)
+    "log_budget", "has_budget"
+]
 
+# Paths to model artifacts
+MODELS_DIR = Path(__file__).parent.parent / "models"
+PCA_PATH = MODELS_DIR / "pca_transformer.pkl"
+BUDGET_MEDIANS_PATH = MODELS_DIR / "budget_medians.json"
+
+
+# Cached loaders for heavy objects
+_pca_transformer = None
+_embedding_model = None
+_budget_medians = None
+
+
+def load_pca_transformer():
+    """Load the fitted PCA transformer from disk."""
+    global _pca_transformer
+    if _pca_transformer is None:
+        with open(PCA_PATH, "rb") as f:
+            _pca_transformer = pickle.load(f)
+    return _pca_transformer
+
+
+def load_embedding_model():
+    """Load the SentenceTransformer model (lazy, cached)."""
+    global _embedding_model
+    if _embedding_model is None:
+        from sentence_transformers import SentenceTransformer
+        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    return _embedding_model
+
+
+def load_budget_medians():
+    """Load budget medians by decade for imputation."""
+    global _budget_medians
+    if _budget_medians is None:
+        with open(BUDGET_MEDIANS_PATH, "r") as f:
+            _budget_medians = json.load(f)
+    return _budget_medians
+
+
+def create_pca_features(overview: str) -> np.ndarray:
+    """
+    Generate PCA features from a movie overview text.
+
+    Args:
+        overview: Movie plot description text
+
+    Returns:
+        numpy array of shape (20,) with PCA features
+    """
+    model = load_embedding_model()
+    pca = load_pca_transformer()
+
+    # Generate embedding (384-dim)
+    embedding = model.encode([overview], show_progress_bar=False)
+
+    # Transform to PCA space (20-dim)
+    pca_features = pca.transform(embedding)[0]
+
+    return pca_features
+
+
+def create_budget_features(budget: float, decade: int) -> tuple:
+    """
+    Create budget features with decade-based imputation.
+
+    Args:
+        budget: Budget in dollars (None or 0 to impute)
+        decade: Movie decade (e.g., 2020) for imputation lookup
+
+    Returns:
+        tuple: (log_budget, has_budget)
+    """
+    budget_medians = load_budget_medians()
+
+    if budget is not None and budget > 0:
+        log_budget = np.log1p(budget)
+        has_budget = 1
+    else:
+        # Impute with decade median, fall back to default
+        decade_key = str(int(decade))
+        log_budget = budget_medians.get(decade_key, budget_medians.get("default", 16.0))
+        has_budget = 0
+
+    return log_budget, has_budget
+
+
+def preprocess_single_movie(
+    movie_data: dict,
+    overview: str,
+    budget: float = None
+) -> pd.DataFrame:
+    """
+    Preprocess a single movie for prediction (Model v5).
+
+    Args:
+        movie_data: Dict with keys:
+            - startYear: int (e.g., 2020)
+            - runtimeMinutes: int (e.g., 120)
+            - isAdult: int (0 or 1)
+            - genres: str (e.g., "Action,Adventure,Sci-Fi")
+        overview: Movie plot description (REQUIRED, non-empty string)
+        budget: Budget in dollars (optional, will be imputed if not provided)
+
+    Returns:
+        DataFrame with one row containing 49 features, ready for model.predict()
+
+    Raises:
+        ValueError: If overview is empty or None
+    """
+    # Validate overview
+    if not overview or not overview.strip():
+        raise ValueError("overview is required and cannot be empty")
+
+    df = pd.DataFrame([movie_data])
+
+    # Temporal features
+    df['movie_age'] = CURRENT_YEAR - df['startYear']
+    df['decade'] = (df['startYear'] // 10 * 10)
+
+    # Runtime
+    df['runtimeMinutes_capped'] = df['runtimeMinutes'].clip(upper=RUNTIME_CAP)
+
+    # Genre features
+    df['genre_count'] = df['genres'].str.split(',').str.len()
+    for genre in VALID_GENRES:
+        df[f'Genre_{genre}'] = df['genres'].str.contains(genre, regex=False).astype(int)
+
+    # PCA features from overview
+    pca_features = create_pca_features(overview)
+    for i, col in enumerate(PCA_COLS):
+        df[col] = pca_features[i]
+
+    # Budget features (with imputation)
+    decade = int(df['decade'].iloc[0])
+    log_budget, has_budget = create_budget_features(budget, decade)
+    df['log_budget'] = log_budget
+    df['has_budget'] = has_budget
+
+    # Return features in correct order
+    return df[FEATURE_ORDER_V5]
+
+
+# ============================================================================
+# Legacy functions for batch processing (used in training)
+# ============================================================================
 
 def load_clean_data(filepath: str = None) -> pd.DataFrame:
     """
@@ -38,7 +203,6 @@ def load_clean_data(filepath: str = None) -> pd.DataFrame:
         DataFrame with clean movie data.
     """
     if filepath is None:
-        # Default path relative to package
         filepath = Path(__file__).parent.parent / "data" / "movies_clean.csv"
 
     df = pd.read_csv(filepath)
@@ -56,36 +220,20 @@ def create_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
 def cap_runtime(df: pd.DataFrame, cap: int = RUNTIME_CAP) -> pd.DataFrame:
     """Cap runtime at specified maximum to handle outliers."""
     df = df.copy()
-    # Convert to numeric (runtimeMinutes is stored as string in movies_clean.csv)
     df['runtimeMinutes'] = pd.to_numeric(df['runtimeMinutes'], errors='coerce')
     df['runtimeMinutes_capped'] = df['runtimeMinutes'].clip(upper=cap)
     return df
 
 
-def create_popularity_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Add log-transformed votes and hit flag."""
-    df = df.copy()
-
-    # Log transform for skewed vote distribution
-    df['log_numVotes'] = np.log1p(df['numVotes'])
-
-    # Hit flag: top 20% by votes
-    percentile_80 = df['numVotes'].quantile(0.80)
-    df['hit'] = (df['numVotes'] >= percentile_80).astype(int)
-
-    return df
-
-
-def create_budget_features(df: pd.DataFrame) -> pd.DataFrame:
+def create_budget_features_batch(df: pd.DataFrame) -> pd.DataFrame:
     """Add budget features (log transform and binary flag)."""
     df = df.copy()
-    
-    # Ensure budget is numeric
+
     if 'budget' in df.columns:
         df['budget'] = pd.to_numeric(df['budget'], errors='coerce').fillna(0)
         df['log_budget'] = np.log1p(df['budget'])
         df['has_budget'] = (df['budget'] > 0).astype(int)
-    
+
     return df
 
 
@@ -96,10 +244,8 @@ def create_genre_features(df: pd.DataFrame, genres: list = None) -> pd.DataFrame
     if genres is None:
         genres = VALID_GENRES
 
-    # Genre count
     df['genre_count'] = df['genres'].str.split(',').str.len()
 
-    # One-hot encode each genre
     for genre in genres:
         df[f'Genre_{genre}'] = df['genres'].str.contains(genre, regex=False).astype(int)
 
@@ -108,75 +254,21 @@ def create_genre_features(df: pd.DataFrame, genres: list = None) -> pd.DataFrame
 
 def preprocess_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Apply all feature engineering transformations.
+    Apply all feature engineering transformations for batch processing.
 
-    This is the main function that converts raw data to model-ready features.
+    This is used for training data preparation.
 
     Args:
-        df: Raw movie DataFrame (from movies_clean.csv)
+        df: Raw movie DataFrame
 
     Returns:
-        DataFrame with all engineered features, ready for modeling.
+        DataFrame with all engineered features.
     """
-    # Apply transformations in order
     df = create_temporal_features(df)
     df = cap_runtime(df)
-    df = create_popularity_features(df)
     df = create_genre_features(df)
+    df = create_budget_features_batch(df)
 
-    # Drop rows with missing values (typically ~22 rows)
     df = df.dropna(subset=['startYear'])
 
-    # Select and order columns for modeling
-    feature_columns = [
-        'averageRating',  # Target
-        'isAdult', 'startYear', 'numVotes', 'genre_count', 'decade',
-        'movie_age', 'runtimeMinutes_capped', 'log_numVotes', 'hit',
-    ] + [f'Genre_{g}' for g in VALID_GENRES]
-
-    return df[feature_columns]
-
-
-def preprocess_single_movie(movie_data: dict) -> pd.DataFrame:
-    """
-    Preprocess a single movie for prediction.
-
-    Args:
-        movie_data: Dict with keys: startYear, runtimeMinutes, numVotes (optional),
-                    isAdult, genres (comma-separated string)
-
-                    If numVotes is None or not provided, uses MEDIAN_NUM_VOTES.
-                    This handles the case of predicting ratings for new movies
-                    that don't have vote data yet.
-
-    Returns:
-        DataFrame with one row, ready for model.predict()
-    """
-    df = pd.DataFrame([movie_data])
-
-    # Handle missing numVotes with median imputation
-    # See model_v3_jesus.ipynb Section 8 for justification
-    if 'numVotes' not in df.columns or df['numVotes'].isna().any() or df['numVotes'].iloc[0] is None:
-        df['numVotes'] = MEDIAN_NUM_VOTES
-
-    # Apply transformations
-    df['movie_age'] = CURRENT_YEAR - df['startYear']
-    df['decade'] = (df['startYear'] // 10 * 10)
-    df['runtimeMinutes_capped'] = df['runtimeMinutes'].clip(upper=RUNTIME_CAP)
-    df['log_numVotes'] = np.log1p(df['numVotes'])
-
-    # Hit flag (using threshold from training data)
-    df['hit'] = (df['numVotes'] >= HIT_THRESHOLD).astype(int)
-
-    # Genre count and one-hot encoding
-    df['genre_count'] = df['genres'].str.split(',').str.len()
-    for genre in VALID_GENRES:
-        df[f'Genre_{genre}'] = df['genres'].str.contains(genre, regex=False).astype(int)
-
-    # Select feature columns (exclude target)
-    feature_columns = [
-        'isAdult', 'startYear', 'numVotes', 'genre_count', 'decade',
-        'movie_age', 'runtimeMinutes_capped', 'log_numVotes', 'hit',
-    ] + [f'Genre_{g}' for g in VALID_GENRES]
-
-    return df[feature_columns]
+    return df

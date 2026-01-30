@@ -27,10 +27,10 @@ All inputs are available before release — making predictions realistic and use
 
 ## Model Inputs
 
-- Genres (Action, Drama, Sci-Fi, etc.)
-- Runtime + Release Year
-- Plot Summary ("overview")
-- Keywords & Tagline
+- **Plot Summary** ("overview") - Converted to embeddings via NLP
+- **Genres** (Action, Drama, Sci-Fi, etc.)
+- **Runtime** + **Release Year**
+- **Budget** (optional)
 
 ## Deliverables
 
@@ -69,13 +69,25 @@ All inputs are available before release — making predictions realistic and use
   - Minority Report (7.6)
   - Ex Machina (7.7)
 
+## Model Performance
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| R² Score | 0.42 | For new movies (no vote data) |
+| Training Data | 39k movies | Rich dataset with TMDB plot data |
+| Algorithm | GradientBoosting | Best performer across 18 experiments |
+| Features | 49 | IMDb metadata + 20 PCA components from plot embeddings |
+
+See `notebooks/jesus/model_v4.ipynb` for full experiment results.
+
 ## Tech Stack
 
 - Python 3.12
 - pandas / numpy
-- scikit-learn
-- NLP libraries (TBD)
-- Streamlit (for demo UI)
+- scikit-learn (GradientBoostingRegressor)
+- sentence-transformers (plot embeddings)
+- FastAPI (REST API)
+- Streamlit (demo UI - TBD)
 
 ## Project Structure
 
@@ -118,10 +130,17 @@ The API will be available at `http://localhost:8000`. Interactive docs at `http:
 
 ### Examples
 
-**Predict rating:**
+**Predict rating (v5):**
 ```bash
-curl "http://localhost:8000/predict?startYear=2024&runtimeMinutes=120&numVotes=50000&genres=Action,Sci-Fi"
+curl "http://localhost:8000/predict?startYear=2024&runtimeMinutes=148&genres=Action,Sci-Fi&overview=A%20team%20of%20astronauts%20travel%20through%20a%20wormhole%20in%20search%20of%20a%20new%20home%20for%20humanity"
 ```
+
+**Parameters:**
+- `startYear` (required): Release year
+- `runtimeMinutes` (required): Movie length
+- `overview` (required): Plot description - used for semantic analysis
+- `genres` (optional): Comma-separated genres (default: "Drama")
+- `budget` (optional): Production budget in dollars
 
 **Find similar movies:**
 ```bash
@@ -149,8 +168,9 @@ python -m floportop.movie_search "dark sci-fi time travel"
 ## 🚀Deployment
 The API is hosted on Google Cloud Run.
 - Production URL: https://floportop-v2-233992317574.europe-west1.run.app/predict
-- Required Inputs: startYear, runtimeMinutes, numVotes.
-- Build Engine: Google Cloud Build (Remote).
+- **Model v5**: Uses plot overview for semantic analysis (no numVotes required)
+- Required Inputs: `startYear`, `runtimeMinutes`, `overview`, `genres`
+- Build Engine: Google Cloud Build (Remote)
 
 ## Le Wagon Data Science & AI Bootcamp
 
