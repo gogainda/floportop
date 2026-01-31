@@ -166,11 +166,56 @@ python -m floportop.movie_search "dark sci-fi time travel"
 | mucahit TIMAR | Developer |
 
 ## 🚀Deployment
-The API is hosted on Google Cloud Run.
-- Production URL: https://floportop-v2-233992317574.europe-west1.run.app/predict
-- **Model v5**: Uses plot overview for semantic analysis (no numVotes required)
-- Required Inputs: `startYear`, `runtimeMinutes`, `overview`, `genres`
-- Build Engine: Google Cloud Build (Remote)
+## 🚀 Deployment & Operations Guide
+
+### 1. Prerequisites & Container Engine
+* **Project ID:** `wagon-bootcamp-479218`
+* **Region:** `europe-west1`
+* **Engine:** Use **OrbStack** (recommended for Mac) or **Docker Desktop**.
+* **Note:** OrbStack is a lightweight, drop-in replacement that uses the same `docker` commands but with better performance on Apple Silicon.
+
+---
+
+### 2. Architecture & Platform Fix
+**Critical:** Google Cloud Run requires **`linux/amd64`** images.
+
+* **The Issue:** Apple Silicon Macs (M1/M2/M3) build `arm64` images by default.
+* **The Fix:** Use **Remote Builds**. By running `gcloud builds submit`, the image is built natively on Google’s `amd64` servers, bypassing local architecture mismatches.
+
+---
+
+### 3. Deployment Commands
+| Task | Command | Description |
+| :--- | :--- | :--- |
+| **Build & Push** | `make gcp_build` | Remote build on GCP; ensures `amd64` compatibility. |
+| **Live Deploy** | `make gcp_deploy` | Launches the latest image to the public Cloud Run URL. |
+| **Full Ship** | `make gcp_ship` | Runs both build and deploy in one sequence. |
+
+# Example of a manual deploy with required resources
+gcloud run deploy floportop-v2 \
+  --image gcr.io/wagon-bootcamp-479218/floportop-v2 \
+  --memory 2Gi \
+  --set-env-vars KAGGLE_API_TOKEN=your_token_here \
+  --region europe-west1
+
+---
+
+### 4. Monitoring & App Access
+* **App URL:** `https://floportop-v2-233992317574.europe-west1.run.app/predict`
+* **Documentation:** Append `/docs` to the URL for the interactive Swagger UI.
+* **Logs:** View live server logs in the terminal:
+  ```bash
+  gcloud run services logs read floportop-v2 --region europe-west1
+
+### 5. Troubleshooting: exec format error
+
+If the app deploys but the logs show exec user process caused "exec format error", you have pushed an arm64 image instead of amd64.
+Verification: Run docker inspect [IMAGE_NAME] | grep Architecture.The Fix: Re-run make gcp_build or use the manual --platform linux/amd64 flag.
+
+### ⚠️ Critical Deployment Notes
+* **Memory Requirements**: This service requires at least **1Gi** (ideally **2Gi**) of RAM to load the FAISS index and XGBoost model simultaneously.
+* **Kaggle Authentication**: The app uses the Kaggle API for data retrieval. You must set the `KAGGLE_API_TOKEN` environment variable during deployment to avoid a startup `OSError`.
+* **Lazy Imports**: Do not move the Kaggle import back to the top of `movie_search.py`; it must remain inside the function to allow the API to boot.
 
 ## Le Wagon Data Science & AI Bootcamp
 

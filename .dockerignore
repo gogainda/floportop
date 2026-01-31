@@ -1,0 +1,27 @@
+# Version Control
+.git
+.gitignore
+
+# Python junk
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.pytest_cache/
+venv/
+.venv/
+.env
+
+# Jupyter & Data (Ignore raw, keep models)
+.ipynb_checkpoints
+data/raw/
+data/processed/
+notebooks/
+
+# Mac/System junk
+.DS_Store
+Thumbs.db
+
+# Deployment artifacts
+Dockerfile
+.dockerignore

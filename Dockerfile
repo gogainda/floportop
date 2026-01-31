@@ -1,14 +1,19 @@
-FROM python:3.10-slim
+FROM python:3.12-slim
 
-WORKDIR /prod
+# Install C++ scaling libraries for PCA/Embeddings
+RUN apt-get update && apt-get install -y \
+    libomp-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+WORKDIR /app
 
-# Now copy your local code/models into the image
-COPY floportop floportop
-COPY api api
-COPY models models
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Use the JSON format to make Docker happy
+# Copy the whole project (including the new heavy models)
+COPY . .
+
+# Set Port for Cloud Run
+EXPOSE 8080
+
 CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8080"]
