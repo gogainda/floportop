@@ -30,6 +30,7 @@ WORKDIR /app
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libomp-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
@@ -48,6 +49,8 @@ COPY --from=builder /app/cache/model /app/cache/model
 # Copy application code
 COPY . .
 
-EXPOSE 8080
+EXPOSE 8080 8501
 
-CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8080"]
+RUN chmod +x start.sh
+
+CMD ["./start.sh"]
