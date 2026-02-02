@@ -25,7 +25,7 @@ gcp_build: check_gcp
 
 # 2. Deploy the image to a live URL
 gcp_deploy: check_gcp
-	gcloud run deploy $(DOCKER_IMAGE_NAME) --project $(GCP_PROJECT_ID) --image gcr.io/$(GCP_PROJECT_ID)/$(DOCKER_IMAGE_NAME) --platform managed --region $(REGION) --allow-unauthenticated --memory 2Gi
+	gcloud run deploy $(DOCKER_IMAGE_NAME) --project $(GCP_PROJECT_ID) --image gcr.io/$(GCP_PROJECT_ID)/$(DOCKER_IMAGE_NAME) --platform managed --region $(REGION) --allow-unauthenticated --memory 2Gi --port 8501
 
 # 3. Do both in one go
 gcp_ship: gcp_build gcp_deploy
