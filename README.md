@@ -104,8 +104,12 @@ floportop/
 │   │   ├── feature_engineering.ipynb  # Feature creation for modeling
 │   │   └── v1/              # Previous notebook versions
 │   └── ...                  # Other team members' notebooks
-├── src/                     # Source code
-├── models/                  # Trained models
+├── floportop/               # Source code (prediction & search)
+├── api/                     # FastAPI endpoints
+├── models/                  # Trained models & FAISS index
+├── requirements.txt         # Full dependencies (dev + prod)
+├── requirements-prod.txt    # Production only (slim Docker)
+├── Dockerfile               # Multi-stage build, CPU-only PyTorch
 └── README.md
 ```
 ## API
@@ -213,9 +217,25 @@ If the app deploys but the logs show exec user process caused "exec format error
 Verification: Run docker inspect [IMAGE_NAME] | grep Architecture.The Fix: Re-run make gcp_build or use the manual --platform linux/amd64 flag.
 
 ### ⚠️ Critical Deployment Notes
-* **Memory Requirements**: This service requires at least **1Gi** (ideally **2Gi**) of RAM to load the FAISS index and XGBoost model simultaneously.
-* **Kaggle Authentication**: The app uses the Kaggle API for data retrieval. You must set the `KAGGLE_API_TOKEN` environment variable during deployment to avoid a startup `OSError`.
+* **Memory Requirements**: This service requires at least **1Gi** of RAM to load the FAISS index and models.
+* **Image Size**: Optimized to **~1.1GB** using CPU-only PyTorch and production-only dependencies.
+* **FAISS Index**: Downloaded from GCS during build (`https://storage.googleapis.com/floportop-models/index.faiss`).
 * **Lazy Imports**: Do not move the Kaggle import back to the top of `movie_search.py`; it must remain inside the function to allow the API to boot.
+
+### Docker Build
+
+```bash
+# Build optimized image (CPU-only, ~1.1GB)
+docker build -t floportop .
+
+# Run locally
+docker run -p 8080:8080 floportop
+
+# Test endpoints
+curl http://localhost:8080/
+curl "http://localhost:8080/predict?startYear=2024&runtimeMinutes=120&genres=Action&overview=A%20hero%20saves%20the%20world"
+curl "http://localhost:8080/similar-film?query=comedy&k=5"
+```
 
 ## Le Wagon Data Science & AI Bootcamp
 

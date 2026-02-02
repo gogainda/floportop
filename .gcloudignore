@@ -22,9 +22,9 @@ models/*.parquet
 .DS_Store
 Thumbs.db
 
-# Deployment artifacts
-Dockerfile
+# Deployment artifacts (keep Dockerfile for gcloud builds)
 .dockerignore
+.gcloudignore
 
 # Dev files not needed in production
 requirements_dev.txt
