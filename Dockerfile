@@ -1,23 +1,56 @@
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy model files and download FAISS index from GCS
+COPY models/ models/
+RUN curl -f -o models/index.faiss https://storage.googleapis.com/floportop-models/index.faiss
+
+# Copy cached embedding model (used by movie_search.py)
+COPY cache/model cache/model
+
+# Install Python dependencies (CPU-only PyTorch to save ~2.5GB)
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements-prod.txt
+
+# Pre-download sentence-transformer models to cache
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5'); SentenceTransformer('all-MiniLM-L6-v2')"
+
+# --- Runtime stage ---
 FROM python:3.12-slim
 
-# Install C++ scaling libraries for PCA/Embeddings and curl for downloading models
-RUN apt-get update && apt-get install -y \
+WORKDIR /app
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libomp-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy models from builder
+COPY --from=builder /app/models /app/models
 
-# Copy the whole project (including the new heavy models)
+# Copy HuggingFace model cache from builder
+COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
+
+# Copy cached embedding model for movie_search
+COPY --from=builder /app/cache/model /app/cache/model
+
+# Copy application code
 COPY . .
 
-# Download FAISS search index from GCS
-RUN curl -f -o models/index.faiss https://storage.googleapis.com/floportop-models/index.faiss
+EXPOSE 8080 8501
 
-# Set Port for Cloud Run
-EXPOSE 8080
+RUN chmod +x start.sh
 
-CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["./start.sh"]
