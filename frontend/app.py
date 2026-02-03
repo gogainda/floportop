@@ -1,10 +1,15 @@
+"""
+Streamlit frontend for movie rating prediction.
+Integrates with the FastAPI backend via HTTP.
+"""
+import os
 from pathlib import Path
 
 import streamlit as st
 import requests
 
-# API base URL (deployed on Google Cloud Run)
-API_URL = "https://floportop-v2-233992317574.europe-west1.run.app"
+# API URL: environment variable or default to GCS deployment
+API_URL = os.environ.get("API_URL", "https://floportop-v2-233992317574.europe-west1.run.app")
 
 # Must be the first Streamlit command
 st.set_page_config(
@@ -23,6 +28,44 @@ AVAILABLE_GENRES = [
     "Fantasy", "History", "Music", "Sci-Fi", "Musical", "War",
     "Animation", "Western", "Sport", "Adult"
 ]
+
+
+# ============================================
+# Helper Functions
+# ============================================
+
+def check_api_health():
+    """Check if the API is available."""
+    try:
+        resp = requests.get(f"{API_URL}/", timeout=5)
+        return resp.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def predict_rating(year, runtime, genres, overview, budget, is_adult):
+    """Call the API to predict movie rating."""
+    params = {
+        "startYear": year,
+        "runtimeMinutes": runtime,
+        "genres": ",".join(genres),
+        "overview": overview,
+        "isAdult": 1 if is_adult else 0,
+    }
+    if budget and budget > 0:
+        params["budget"] = budget
+
+    resp = requests.get(f"{API_URL}/predict", params=params, timeout=60)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def search_similar_films(query, k=5):
+    """Call the API to find similar films."""
+    params = {"query": query, "k": k}
+    resp = requests.get(f"{API_URL}/similar-film", params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def render_rating_card(state="placeholder", rating=None):
@@ -52,10 +95,24 @@ def render_rating_card(state="placeholder", rating=None):
             <h2>Oops! Try again...</h2>
         </div>
         """
+    return ""
 
+
+# ============================================
+# Main App
+# ============================================
 
 def main():
-    st.title("Will This Movie Be Good?")
+    st.title("🎬 Floportop")
+    st.caption("Predict movie ratings and find similar films")
+
+    # API status indicator in sidebar
+    api_online = check_api_health()
+    if api_online:
+        st.sidebar.success("✅ API Online")
+    else:
+        st.sidebar.warning("⚠️ API may be cold starting...")
+        st.sidebar.caption(f"URL: {API_URL}")
 
     # Initialize session state
     if "rating" not in st.session_state:
@@ -78,12 +135,16 @@ def main():
         genres = st.multiselect("Genres", AVAILABLE_GENRES, ["Drama"])
 
         # Row 3: Plot Overview
-        overview = st.text_area("Plot Overview", placeholder="Describe the movie...")
+        overview = st.text_area(
+            "Plot Overview",
+            placeholder="Describe the movie plot...",
+            height=100
+        )
 
-        # Hidden option
+        # Options
         is_adult = st.checkbox("Adult Content (18+)")
 
-        submitted = st.form_submit_button("Predict Rating")
+        submitted = st.form_submit_button("Predict Rating", use_container_width=True)
 
     # Rating card - below the form
     rating_container = st.empty()
@@ -106,84 +167,74 @@ def main():
     if submitted:
         if not overview.strip():
             st.error("Plot overview is required!")
-            return
-        if not genres:
+        elif not genres:
             st.error("Select at least one genre!")
-            return
-
-        # Show loading state
-        rating_container.markdown(
-            render_rating_card("loading"),
-            unsafe_allow_html=True,
-        )
-
-        # Call the prediction API
-        try:
-            response = requests.get(
-                f"{API_URL}/predict",
-                params={
-                    "startYear": int(year),
-                    "runtimeMinutes": int(runtime),
-                    "isAdult": 1 if is_adult else 0,
-                    "genres": ",".join(genres),
-                    "overview": overview,
-                    "budget": budget if budget > 0 else None,
-                },
-                timeout=60,
-            )
-            response.raise_for_status()
-            result = response.json()
-            rating = result["predicted_rating"]
-
-            # Store in session state and show result
-            st.session_state.rating = rating
-            st.session_state.show_result = True
-
+        else:
+            # Show loading state
             rating_container.markdown(
-                render_rating_card("result", rating),
+                render_rating_card("loading"),
                 unsafe_allow_html=True,
             )
 
-        except requests.exceptions.RequestException as e:
-            rating_container.markdown(
-                render_rating_card("error"),
-                unsafe_allow_html=True,
-            )
-            st.error(f"Prediction failed: {e}")
-            return
+            try:
+                result = predict_rating(year, runtime, genres, overview, budget, is_adult)
+                rating = result["predicted_rating"]
 
-        # Call the similar movies API
-        with similar_container:
-            with st.spinner("Finding similar movies..."):
-                try:
-                    response = requests.get(
-                        f"{API_URL}/similar-film",
-                        params={"query": overview, "k": 5},
-                        timeout=30,
-                    )
-                    response.raise_for_status()
-                    result = response.json()
+                # Store in session state and show result
+                st.session_state.rating = rating
+                st.session_state.show_result = True
 
-                    st.subheader("Similar Movies")
-                    for movie in result["results"]:
-                        vote = movie.get("vote_average", 0)
-                        title = movie.get("title", "Unknown")
-                        movie_overview = movie.get("overview", "")
-                        display_overview = ""
-                        if movie_overview:
-                            display_overview = movie_overview[:200] + "..." if len(movie_overview) > 200 else movie_overview
+                rating_container.markdown(
+                    render_rating_card("result", rating),
+                    unsafe_allow_html=True,
+                )
 
-                        st.markdown(
-                            f"""
-                            <div class="movie-card">
-                                <strong>{title}</strong> — ⭐ {vote:.1f}
-                                <br><small style="color: #666;">{display_overview}</small>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                except requests.exceptions.RequestException as e:
-                    st.warning(f"Could not find similar movies: {e}")
+            except requests.HTTPError as e:
+                rating_container.markdown(
+                    render_rating_card("error"),
+                    unsafe_allow_html=True,
+                )
+                st.error(f"API Error: {e.response.text}")
+                return
+            except requests.RequestException as e:
+                rating_container.markdown(
+                    render_rating_card("error"),
+                    unsafe_allow_html=True,
+                )
+                st.error(f"Connection failed: {e}")
+                return
+
+            # Similar movies - automatically after rating
+            with similar_container:
+                with st.spinner("Finding similar movies..."):
+                    try:
+                        result = search_similar_films(overview, k=5)
+
+                        if result["results"]:
+                            st.subheader("Similar Movies")
+                            for movie in result["results"]:
+                                title = movie.get("title", "Unknown")
+                                vote = movie.get("vote_average", 0)
+                                movie_overview = movie.get("overview", "")
+                                display_overview = ""
+                                if movie_overview:
+                                    display_overview = movie_overview[:200] + "..." if len(movie_overview) > 200 else movie_overview
+
+                                st.markdown(
+                                    f"""
+                                    <div class="movie-card">
+                                        <strong>{title}</strong> — ⭐ {vote:.1f}
+                                        <br><small style="color: #666;">{display_overview}</small>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
+
+                    except requests.HTTPError as e:
+                        error_detail = e.response.json().get("detail", str(e))
+                        st.warning(f"Similar movies unavailable: {error_detail}")
+                    except requests.RequestException as e:
+                        st.warning(f"Could not find similar movies: {e}")
 
 
 if __name__ == "__main__":

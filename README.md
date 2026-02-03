@@ -87,7 +87,7 @@ See `notebooks/jesus/model_v4.ipynb` for full experiment results.
 - scikit-learn (GradientBoostingRegressor)
 - sentence-transformers (plot embeddings)
 - FastAPI (REST API)
-- Streamlit (demo UI - TBD)
+- Streamlit (demo UI)
 
 ## Project Structure
 
@@ -104,8 +104,13 @@ floportop/
 │   │   ├── feature_engineering.ipynb  # Feature creation for modeling
 │   │   └── v1/              # Previous notebook versions
 │   └── ...                  # Other team members' notebooks
-├── src/                     # Source code
-├── models/                  # Trained models
+├── floportop/               # Source code (prediction & search)
+├── api/                     # FastAPI endpoints
+├── frontend/                # Streamlit UI (calls API via HTTP)
+├── models/                  # Trained models & FAISS index
+├── requirements.txt         # Full dependencies (dev + prod)
+├── requirements-prod.txt    # Production only (slim Docker)
+├── Dockerfile               # Multi-stage build, CPU-only PyTorch
 └── README.md
 ```
 ## API
@@ -201,8 +206,9 @@ gcloud run deploy floportop-v2 \
 ---
 
 ### 4. Monitoring & App Access
-* **App URL:** `https://floportop-v2-233992317574.europe-west1.run.app/predict`
-* **Documentation:** Append `/docs` to the URL for the interactive Swagger UI.
+* **Streamlit UI:** `https://floportop-v2-25462497140.europe-west1.run.app`
+* **Features:** Rating prediction + Similar films search (two tabs)
+* **Note:** Cold starts take ~60s due to model loading. The container runs both Streamlit (port 8501, exposed) and FastAPI (port 8080, internal).
 * **Logs:** View live server logs in the terminal:
   ```bash
   gcloud run services logs read floportop-v2 --region europe-west1
@@ -213,9 +219,30 @@ If the app deploys but the logs show exec user process caused "exec format error
 Verification: Run docker inspect [IMAGE_NAME] | grep Architecture.The Fix: Re-run make gcp_build or use the manual --platform linux/amd64 flag.
 
 ### ⚠️ Critical Deployment Notes
-* **Memory Requirements**: This service requires at least **1Gi** (ideally **2Gi**) of RAM to load the FAISS index and XGBoost model simultaneously.
-* **Kaggle Authentication**: The app uses the Kaggle API for data retrieval. You must set the `KAGGLE_API_TOKEN` environment variable during deployment to avoid a startup `OSError`.
+* **Memory Requirements**: This service requires at least **2Gi** of RAM to load the FAISS index and models.
+* **Image Size**: Optimized to **~1.8GB** using CPU-only PyTorch and production-only dependencies.
+* **Ports**: Container runs API on 8080 (internal) and Streamlit on 8501 (exposed to Cloud Run).
+* **FAISS Index**: Downloaded from GCS during build (`https://storage.googleapis.com/floportop-models/index.faiss`).
 * **Lazy Imports**: Do not move the Kaggle import back to the top of `movie_search.py`; it must remain inside the function to allow the API to boot.
+
+### Docker Build
+
+```bash
+# Build optimized image (CPU-only, ~1.8GB)
+docker build -t floportop .
+
+# Run locally (exposes both API and Streamlit UI)
+docker run -p 8080:8080 -p 8501:8501 floportop
+
+# Access:
+# - Streamlit UI: http://localhost:8501
+# - API directly: http://localhost:8080
+
+# Test API endpoints
+curl http://localhost:8080/
+curl "http://localhost:8080/predict?startYear=2024&runtimeMinutes=120&genres=Action&overview=A%20hero%20saves%20the%20world"
+curl "http://localhost:8080/similar-film?query=comedy&k=5"
+```
 
 ## Le Wagon Data Science & AI Bootcamp
 
