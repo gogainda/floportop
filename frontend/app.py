@@ -82,25 +82,39 @@ def render_movie_card(movie):
     """Render a compact movie card for bento grid."""
     title = movie.get("title", "Unknown")
     imdb_id = movie.get("imdb_id", "")
-    genres = movie.get("genres", "")
+    genres_raw = movie.get("genres", "")
     rating = movie.get("vote_average", 0)
+
+    # Clean up genres - handle list, string, or empty
+    if isinstance(genres_raw, list):
+        genres = ", ".join(genres_raw) if genres_raw else ""
+    elif isinstance(genres_raw, str):
+        # Remove brackets if it's a string representation of a list
+        genres = genres_raw.strip("[]'\"").replace("', '", ", ").replace("','", ", ")
+    else:
+        genres = ""
 
     rating_class = get_rating_class(rating)
 
-    imdb_link_html = ""
+    # Make title clickable if we have IMDb ID
     if imdb_id:
+        title_html = f'<a href="https://www.imdb.com/title/{imdb_id}/" target="_blank" class="movie-title-link">{title}</a>'
         imdb_link_html = f'<a href="https://www.imdb.com/title/{imdb_id}/" target="_blank" class="imdb-link">IMDb</a>'
+    else:
+        title_html = f'<span class="movie-title">{title}</span>'
+        imdb_link_html = ""
 
-    return f'''
-    <div class="movie-card">
-        <div class="movie-card-header">
-            <span class="movie-title">{title}</span>
-            <span class="rating-badge {rating_class}">{rating:.1f}</span>
-        </div>
-        <span class="movie-genres">{genres}</span>
-        {imdb_link_html}
-    </div>
-    '''
+    # Only show genres if we have them
+    genres_html = f'<span class="movie-genres">{genres}</span>' if genres else ""
+
+    return f'''<div class="movie-card">
+<div class="movie-card-header">
+{title_html}
+<span class="rating-badge {rating_class}">{rating:.1f}</span>
+</div>
+{genres_html}
+{imdb_link_html}
+</div>'''
 
 
 def render_full_bar_placeholder():
@@ -123,9 +137,10 @@ def render_full_bar_loading():
 
 def render_bento_with_loading_movies(rating):
     """Bento layout: rating ready, movies still loading."""
+    rating_class = get_rating_class(rating)
     return f'''
     <div class="bento-container">
-        <div class="rating-card">
+        <div class="rating-card {rating_class}">
             <h1>{rating:.1f}/10</h1>
             <p>Predicted Rating</p>
         </div>
@@ -138,18 +153,17 @@ def render_bento_with_loading_movies(rating):
 
 def render_bento_complete(rating, movies):
     """Bento layout: rating and movies both ready."""
-    cards_html = "".join(render_movie_card(m) for m in movies)
-    return f'''
-    <div class="bento-container">
-        <div class="rating-card">
-            <h1>{rating:.1f}/10</h1>
-            <p>Predicted Rating</p>
-        </div>
-        <div class="similar-movies-grid">
-            {cards_html}
-        </div>
-    </div>
-    '''
+    # Filter out movies with 0.0 rating
+    valid_movies = [m for m in movies if m.get("vote_average", 0) > 0]
+    cards_html = "".join(render_movie_card(m) for m in valid_movies)
+    rating_class = get_rating_class(rating)
+    return f'''<div class="bento-container">
+<div class="rating-card {rating_class}">
+<h1>{rating:.1f}/10</h1>
+<p>Predicted Rating</p>
+</div>
+<div class="similar-movies-grid">{cards_html}</div>
+</div>'''
 
 
 # ============================================
