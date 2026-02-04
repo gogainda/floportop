@@ -15,6 +15,7 @@ API_URL = os.environ.get("API_URL", "https://floportop-v2-233992317574.europe-we
 st.set_page_config(
     page_title="Floportop - Movie Rating Predictor",
     page_icon="logo.svg",
+    layout="wide",
 )
 
 # Load custom CSS
@@ -68,34 +69,87 @@ def search_similar_films(query, k=5):
     return resp.json()
 
 
-def render_rating_card(state="placeholder", rating=None):
-    """Render the rating card in different states."""
-    if state == "placeholder":
-        return """
-        <div class="rating-card placeholder">
-            <h2>Flop or Top? Let's see...</h2>
+def get_rating_class(rating):
+    """Return CSS class based on rating value."""
+    if rating >= 7.0:
+        return "high"
+    elif rating >= 5.0:
+        return "medium"
+    return "low"
+
+
+def render_movie_card(movie):
+    """Render a compact movie card for bento grid."""
+    title = movie.get("title", "Unknown")
+    imdb_id = movie.get("imdb_id", "")
+    genres = movie.get("genres", "")
+    rating = movie.get("vote_average", 0)
+
+    rating_class = get_rating_class(rating)
+
+    imdb_link_html = ""
+    if imdb_id:
+        imdb_link_html = f'<a href="https://www.imdb.com/title/{imdb_id}/" target="_blank" class="imdb-link">IMDb</a>'
+
+    return f'''
+    <div class="movie-card">
+        <div class="movie-card-header">
+            <span class="movie-title">{title}</span>
+            <span class="rating-badge {rating_class}">{rating:.1f}</span>
         </div>
-        """
-    elif state == "loading":
-        return """
-        <div class="rating-card loading">
-            <h2>Analyzing your movie...</h2>
-        </div>
-        """
-    elif state == "result" and rating is not None:
-        return f"""
-        <div class="rating-card result">
+        <span class="movie-genres">{genres}</span>
+        {imdb_link_html}
+    </div>
+    '''
+
+
+def render_full_bar_placeholder():
+    """Full-width bar - initial state."""
+    return '''
+    <div class="full-bar">
+        <h2>Flop or Top? Let's find out...</h2>
+    </div>
+    '''
+
+
+def render_full_bar_loading():
+    """Full-width bar - loading state."""
+    return '''
+    <div class="full-bar loading">
+        <h2>Analyzing your movie...</h2>
+    </div>
+    '''
+
+
+def render_bento_with_loading_movies(rating):
+    """Bento layout: rating ready, movies still loading."""
+    return f'''
+    <div class="bento-container">
+        <div class="rating-card">
             <h1>{rating:.1f}/10</h1>
-            <p>Predicted IMDb Rating</p>
+            <p>Predicted Rating</p>
         </div>
-        """
-    elif state == "error":
-        return """
-        <div class="rating-card placeholder">
-            <h2>Oops! Try again...</h2>
+        <div class="movies-loading">
+            <p>Finding similar movies...</p>
         </div>
-        """
-    return ""
+    </div>
+    '''
+
+
+def render_bento_complete(rating, movies):
+    """Bento layout: rating and movies both ready."""
+    cards_html = "".join(render_movie_card(m) for m in movies)
+    return f'''
+    <div class="bento-container">
+        <div class="rating-card">
+            <h1>{rating:.1f}/10</h1>
+            <p>Predicted Rating</p>
+        </div>
+        <div class="similar-movies-grid">
+            {cards_html}
+        </div>
+    </div>
+    '''
 
 
 # ============================================
@@ -103,15 +157,15 @@ def render_rating_card(state="placeholder", rating=None):
 # ============================================
 
 def main():
-    st.title("🎬 Floportop")
+    st.title("Floportop")
     st.caption("Predict movie ratings and find similar films")
 
     # API status indicator in sidebar
     api_online = check_api_health()
     if api_online:
-        st.sidebar.success("✅ API Online")
+        st.sidebar.success("API Online")
     else:
-        st.sidebar.warning("⚠️ API may be cold starting...")
+        st.sidebar.warning("API may be cold starting...")
         st.sidebar.caption(f"URL: {API_URL}")
 
     # Initialize session state
@@ -120,16 +174,16 @@ def main():
     if "show_result" not in st.session_state:
         st.session_state.show_result = False
 
-    # Form
+    # Form - more compact
     with st.form("movie_form"):
         # Row 1: Year, Runtime, Budget
         col1, col2, col3 = st.columns(3)
         with col1:
-            year = st.number_input("Release Year", 1900, 2030, 2024)
+            year = st.number_input("Year", 1900, 2030, 2024)
         with col2:
             runtime = st.number_input("Runtime (min)", 1, 500, 120)
         with col3:
-            budget = st.number_input("Budget (USD)", 0, 500_000_000, 0)
+            budget = st.number_input("Budget ($)", 0, 500_000_000, 0)
 
         # Row 2: Genres
         genres = st.multiselect("Genres", AVAILABLE_GENRES, ["Drama"])
@@ -141,28 +195,17 @@ def main():
             height=100
         )
 
-        # Options
+        # Row 4: Adult content option
         is_adult = st.checkbox("Adult Content (18+)")
 
         submitted = st.form_submit_button("Predict Rating", use_container_width=True)
 
-    # Rating card - below the form
-    rating_container = st.empty()
+    # Results container
+    results_container = st.empty()
 
-    # Show current state
-    if st.session_state.show_result and st.session_state.rating is not None:
-        rating_container.markdown(
-            render_rating_card("result", st.session_state.rating),
-            unsafe_allow_html=True,
-        )
-    else:
-        rating_container.markdown(
-            render_rating_card("placeholder"),
-            unsafe_allow_html=True,
-        )
-
-    # Similar movies container
-    similar_container = st.container()
+    # Initial state: show full-width bar
+    if not st.session_state.show_result:
+        results_container.markdown(render_full_bar_placeholder(), unsafe_allow_html=True)
 
     if submitted:
         if not overview.strip():
@@ -170,71 +213,49 @@ def main():
         elif not genres:
             st.error("Select at least one genre!")
         else:
-            # Show loading state
-            rating_container.markdown(
-                render_rating_card("loading"),
-                unsafe_allow_html=True,
-            )
+            # Step 1: Full bar loading state
+            results_container.markdown(render_full_bar_loading(), unsafe_allow_html=True)
 
             try:
+                # Get rating prediction
                 result = predict_rating(year, runtime, genres, overview, budget, is_adult)
                 rating = result["predicted_rating"]
 
-                # Store in session state and show result
+                # Store in session state
                 st.session_state.rating = rating
                 st.session_state.show_result = True
 
-                rating_container.markdown(
-                    render_rating_card("result", rating),
+                # Step 2: Show bento with rating + movies loading
+                results_container.markdown(
+                    render_bento_with_loading_movies(rating),
                     unsafe_allow_html=True,
                 )
 
             except requests.HTTPError as e:
-                rating_container.markdown(
-                    render_rating_card("error"),
-                    unsafe_allow_html=True,
-                )
+                results_container.markdown(render_full_bar_placeholder(), unsafe_allow_html=True)
                 st.error(f"API Error: {e.response.text}")
                 return
             except requests.RequestException as e:
-                rating_container.markdown(
-                    render_rating_card("error"),
-                    unsafe_allow_html=True,
-                )
+                results_container.markdown(render_full_bar_placeholder(), unsafe_allow_html=True)
                 st.error(f"Connection failed: {e}")
                 return
 
-            # Similar movies - automatically after rating
-            with similar_container:
-                with st.spinner("Finding similar movies..."):
-                    try:
-                        result = search_similar_films(overview, k=5)
+            # Step 3: Fetch similar movies
+            try:
+                similar_result = search_similar_films(overview, k=5)
 
-                        if result["results"]:
-                            st.subheader("Similar Movies")
-                            for movie in result["results"]:
-                                title = movie.get("title", "Unknown")
-                                vote = movie.get("vote_average", 0)
-                                movie_overview = movie.get("overview", "")
-                                display_overview = ""
-                                if movie_overview:
-                                    display_overview = movie_overview[:200] + "..." if len(movie_overview) > 200 else movie_overview
+                if similar_result["results"]:
+                    # Step 4: Show complete bento with movies
+                    results_container.markdown(
+                        render_bento_complete(rating, similar_result["results"]),
+                        unsafe_allow_html=True,
+                    )
 
-                                st.markdown(
-                                    f"""
-                                    <div class="movie-card">
-                                        <strong>{title}</strong> — ⭐ {vote:.1f}
-                                        <br><small style="color: #666;">{display_overview}</small>
-                                    </div>
-                                    """,
-                                    unsafe_allow_html=True,
-                                )
-
-                    except requests.HTTPError as e:
-                        error_detail = e.response.json().get("detail", str(e))
-                        st.warning(f"Similar movies unavailable: {error_detail}")
-                    except requests.RequestException as e:
-                        st.warning(f"Could not find similar movies: {e}")
+            except requests.HTTPError as e:
+                error_detail = e.response.json().get("detail", str(e))
+                st.caption(f"Similar movies unavailable: {error_detail}")
+            except requests.RequestException as e:
+                st.caption(f"Could not find similar movies: {e}")
 
 
 if __name__ == "__main__":

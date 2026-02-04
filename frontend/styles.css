@@ -1,92 +1,176 @@
 /* ============================================
-   PREDICT BUTTON
+   GLOBAL LAYOUT
    ============================================ */
 
-/* Target the Streamlit form submit button */
-div.stForm button[kind="primaryFormSubmit"],
-div.stForm button[type="submit"] {
-    width: 100%;
-    padding: 0.8rem 2rem;
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: white;
-    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3);
-    margin-top: 1rem;
+/* Push content to the top */
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 0 !important;
 }
 
-div.stForm button[kind="primaryFormSubmit"]:hover,
-div.stForm button[type="submit"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(30, 58, 95, 0.4);
-    background: linear-gradient(135deg, #2d5a87 0%, #3d7ab7 100%);
+/* Reduce title margins */
+h1 {
+    margin-top: 0 !important;
+    margin-bottom: 0.25rem !important;
 }
 
-div.stForm button[kind="primaryFormSubmit"]:active,
-div.stForm button[type="submit"]:active {
-    transform: translateY(0);
-    box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3);
+/* Compact caption */
+.stMarkdown p {
+    margin-bottom: 0.5rem !important;
+}
+
+/* Form styling - compact padding */
+div.stForm > div {
+    padding: 1rem 1.25rem !important;
+}
+
+/* Space between form elements */
+div.stForm .stNumberInput,
+div.stForm .stMultiSelect,
+div.stForm .stTextArea,
+div.stForm .stCheckbox {
+    margin-bottom: 0.5rem !important;
+}
+
+/* Smaller text area */
+div.stTextArea textarea {
+    min-height: 70px !important;
 }
 
 /* ============================================
-   RATING CARD
+   PREDICT BUTTON
    ============================================ */
 
-.rating-card {
+/* Target ONLY the form submit button, not number input buttons */
+.stFormSubmitButton button,
+.stFormSubmitButton > button,
+div[data-testid="stFormSubmitButton"] button {
+    width: 100% !important;
+    padding: 0.9rem 2rem !important;
+    font-size: 1.2rem !important;
+    font-weight: 600 !important;
+    color: white !important;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3) !important;
+    margin-top: 1rem !important;
+}
+
+.stFormSubmitButton button:hover,
+div[data-testid="stFormSubmitButton"] button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(30, 58, 95, 0.4) !important;
+    background: linear-gradient(135deg, #2d5a87 0%, #3d7ab7 100%) !important;
+}
+
+.stFormSubmitButton button:active,
+div[data-testid="stFormSubmitButton"] button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3) !important;
+}
+
+/* ============================================
+   FULL-WIDTH BAR (Initial & Loading states)
+   ============================================ */
+
+.full-bar {
     background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
     border-radius: 16px;
-    padding: 1.5rem;
+    padding: 2rem;
     text-align: center;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    margin: 1rem 0;
-    min-height: 120px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    margin-top: 1rem;
+    min-height: 100px;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    align-items: center;
 }
 
-.rating-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.35);
-}
-
-/* Placeholder state */
-.rating-card.placeholder h2 {
+.full-bar h2 {
     color: #a0c4e8;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     margin: 0;
     font-weight: 400;
 }
 
-/* Loading state */
-.rating-card.loading h2 {
-    color: #a0c4e8;
-    font-size: 1.3rem;
-    margin: 0;
+.full-bar.loading h2 {
     animation: fadeInOut 1.5s ease-in-out infinite;
 }
 
-/* Result state - single pop animation */
-.rating-card.result {
+/* ============================================
+   BENTO BOX RESULTS LAYOUT
+   ============================================ */
+
+.bento-container {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+    min-height: 200px;
+}
+
+/* ============================================
+   RATING CARD (Left side of bento - square)
+   ============================================ */
+
+.rating-card {
+    background: linear-gradient(135deg, #ff4b4b 0%, #ff6b6b 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(255, 75, 75, 0.3);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    aspect-ratio: 1;
     animation: popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-.rating-card.result h1 {
-    color: #ffffff;
-    font-size: 3rem;
-    margin: 0;
+.rating-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(255, 75, 75, 0.4);
+    transition: all 0.3s ease;
 }
 
-.rating-card.result p {
-    color: #a0c4e8;
-    font-size: 1rem;
+.rating-card h1 {
+    color: #ffffff;
+    font-size: 2.5rem;
+    margin: 0;
+    font-weight: 700;
+}
+
+.rating-card p {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.85rem;
     margin-top: 0.3rem;
     margin-bottom: 0;
+}
+
+/* ============================================
+   MOVIES LOADING (Right side placeholder)
+   ============================================ */
+
+.movies-loading {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 8px 30px rgba(30, 58, 95, 0.25);
+}
+
+.movies-loading p {
+    color: #a0c4e8;
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin: 0;
+    animation: fadeInOut 1.5s ease-in-out infinite;
 }
 
 /* ============================================
@@ -118,26 +202,160 @@ div.stForm button[type="submit"]:active {
     }
 }
 
+/* Staggered slide-in animation for movie cards */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
 /* ============================================
-   SIMILAR MOVIES CARDS
+   SIMILAR MOVIES - BENTO GRID (Right side)
+   ============================================ */
+
+.similar-movies-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    max-height: 220px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.similar-movies-grid::-webkit-scrollbar {
+    width: 4px;
+}
+
+.similar-movies-grid::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.similar-movies-grid::-webkit-scrollbar-thumb {
+    background: #2d5a87;
+    border-radius: 2px;
+}
+
+/* ============================================
+   MOVIE CARDS - Compact for Bento Grid
    ============================================ */
 
 .movie-card {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 0.5rem 0;
-    border-left: 4px solid #2d5a87;
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 10px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e8e8e8;
     transition: all 0.25s ease;
     cursor: default;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    animation: fadeIn 0.3s ease-out backwards;
 }
 
+/* Staggered animation delays */
+.movie-card:nth-child(1) { animation-delay: 0.05s; }
+.movie-card:nth-child(2) { animation-delay: 0.1s; }
+.movie-card:nth-child(3) { animation-delay: 0.15s; }
+.movie-card:nth-child(4) { animation-delay: 0.2s; }
+.movie-card:nth-child(5) { animation-delay: 0.25s; }
+
 .movie-card:hover {
-    transform: translateX(8px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-    background: #ffffff;
-    border-left-color: #1e3a5f;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    border-color: #2d5a87;
 }
+
+/* Movie title and rating row */
+.movie-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.4rem;
+}
+
+.movie-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e3a5f;
+    margin: 0;
+    line-height: 1.25;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Rating badge - compact */
+.rating-badge {
+    flex-shrink: 0;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+}
+
+.rating-badge.high {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.rating-badge.medium {
+    background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+}
+
+.rating-badge.low {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* Genres - very compact */
+.movie-genres {
+    font-size: 0.7rem;
+    color: #6b7280;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* IMDb link - compact */
+.imdb-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: #f5c518;
+    color: #000000;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    width: fit-content;
+}
+
+.imdb-link:hover {
+    background: #e3b317;
+    box-shadow: 0 2px 6px rgba(245, 197, 24, 0.4);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 
 /* ============================================
    FORM INPUTS - subtle hover effects
@@ -158,4 +376,19 @@ div.stTextArea textarea:focus {
 /* Multiselect hover */
 div.stMultiSelect > div > div:hover {
     border-color: #2d5a87 !important;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 768px) {
+    .bento-container {
+        grid-template-columns: 1fr;
+    }
+
+    .rating-card {
+        aspect-ratio: auto;
+        max-height: none;
+    }
 }

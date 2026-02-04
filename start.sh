@@ -1,6 +1,9 @@
 #!/bin/bash
 # Start both API and Streamlit frontend
 
+# Set API URL for internal communication
+export API_URL="http://localhost:8080"
+
 # Start API in background
 uvicorn api.app:app --host 0.0.0.0 --port 8080 &
 
