@@ -3,10 +3,24 @@ Streamlit frontend for movie rating prediction.
 Integrates with the FastAPI backend via HTTP.
 """
 import os
+from pathlib import Path
+
 import streamlit as st
 import requests
 
-API_URL = os.environ.get("API_URL", "http://127.0.0.1:8080")
+# API URL: environment variable or default to GCS deployment
+API_URL = os.environ.get("API_URL", "https://floportop-v2-233992317574.europe-west1.run.app")
+
+# Must be the first Streamlit command
+st.set_page_config(
+    page_title="Floportop - Movie Rating Predictor",
+    page_icon="logo.svg",
+)
+
+# Load custom CSS
+css_file = Path(__file__).parent / "styles.css"
+if css_file.exists():
+    st.markdown(f"<style>{css_file.read_text()}</style>", unsafe_allow_html=True)
 
 AVAILABLE_GENRES = [
     "Drama", "Comedy", "Documentary", "Romance", "Action", "Crime",
@@ -15,6 +29,10 @@ AVAILABLE_GENRES = [
     "Animation", "Western", "Sport", "Adult"
 ]
 
+
+# ============================================
+# Helper Functions
+# ============================================
 
 def check_api_health():
     """Check if the API is available."""
@@ -37,12 +55,12 @@ def predict_rating(year, runtime, genres, overview, budget, is_adult):
     if budget and budget > 0:
         params["budget"] = budget
 
-    resp = requests.get(f"{API_URL}/predict", params=params, timeout=30)
+    resp = requests.get(f"{API_URL}/predict", params=params, timeout=60)
     resp.raise_for_status()
     return resp.json()
 
 
-def search_similar_films(query, k=10):
+def search_similar_films(query, k=5):
     """Call the API to find similar films."""
     params = {"query": query, "k": k}
     resp = requests.get(f"{API_URL}/similar-film", params=params, timeout=30)
@@ -50,103 +68,173 @@ def search_similar_films(query, k=10):
     return resp.json()
 
 
+def render_rating_card(state="placeholder", rating=None):
+    """Render the rating card in different states."""
+    if state == "placeholder":
+        return """
+        <div class="rating-card placeholder">
+            <h2>Flop or Top? Let's see...</h2>
+        </div>
+        """
+    elif state == "loading":
+        return """
+        <div class="rating-card loading">
+            <h2>Analyzing your movie...</h2>
+        </div>
+        """
+    elif state == "result" and rating is not None:
+        return f"""
+        <div class="rating-card result">
+            <h1>{rating:.1f}/10</h1>
+            <p>Predicted IMDb Rating</p>
+        </div>
+        """
+    elif state == "error":
+        return """
+        <div class="rating-card placeholder">
+            <h2>Oops! Try again...</h2>
+        </div>
+        """
+    return ""
+
+
+# ============================================
+# Main App
+# ============================================
+
 def main():
-    st.set_page_config(page_title="Floportop - Movie Rating Predictor", page_icon="🎬")
     st.title("🎬 Floportop")
     st.caption("Predict movie ratings and find similar films")
 
-    # API status indicator
+    # API status indicator in sidebar
     api_online = check_api_health()
     if api_online:
         st.sidebar.success("✅ API Online")
     else:
-        st.sidebar.error(f"❌ API Offline ({API_URL})")
-        st.error("Cannot connect to the API. Please ensure the backend is running.")
-        return
+        st.sidebar.warning("⚠️ API may be cold starting...")
+        st.sidebar.caption(f"URL: {API_URL}")
 
-    tab1, tab2 = st.tabs(["🎯 Predict Rating", "🔍 Find Similar Films"])
+    # Initialize session state
+    if "rating" not in st.session_state:
+        st.session_state.rating = None
+    if "show_result" not in st.session_state:
+        st.session_state.show_result = False
 
-    # Tab 1: Rating Prediction
-    with tab1:
-        st.header("Will This Movie Be Good?")
+    # Form
+    with st.form("movie_form"):
+        # Row 1: Year, Runtime, Budget
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            year = st.number_input("Release Year", 1900, 2030, 2024)
+        with col2:
+            runtime = st.number_input("Runtime (min)", 1, 500, 120)
+        with col3:
+            budget = st.number_input("Budget (USD)", 0, 500_000_000, 0)
 
-        with st.form("movie_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                year = st.number_input("Release Year", 1900, 2030, 2024)
-                runtime = st.number_input("Runtime (minutes)", 1, 500, 120)
-            with col2:
-                budget = st.number_input("Budget (USD, optional)", 0, 500_000_000, 0)
-                is_adult = st.checkbox("Adult Content (18+)")
+        # Row 2: Genres
+        genres = st.multiselect("Genres", AVAILABLE_GENRES, ["Drama"])
 
-            genres = st.multiselect("Genres", AVAILABLE_GENRES, ["Drama"])
-            overview = st.text_area(
-                "Plot Overview",
-                placeholder="Describe the movie plot...",
-                height=100
+        # Row 3: Plot Overview
+        overview = st.text_area(
+            "Plot Overview",
+            placeholder="Describe the movie plot...",
+            height=100
+        )
+
+        # Options
+        is_adult = st.checkbox("Adult Content (18+)")
+
+        submitted = st.form_submit_button("Predict Rating", use_container_width=True)
+
+    # Rating card - below the form
+    rating_container = st.empty()
+
+    # Show current state
+    if st.session_state.show_result and st.session_state.rating is not None:
+        rating_container.markdown(
+            render_rating_card("result", st.session_state.rating),
+            unsafe_allow_html=True,
+        )
+    else:
+        rating_container.markdown(
+            render_rating_card("placeholder"),
+            unsafe_allow_html=True,
+        )
+
+    # Similar movies container
+    similar_container = st.container()
+
+    if submitted:
+        if not overview.strip():
+            st.error("Plot overview is required!")
+        elif not genres:
+            st.error("Select at least one genre!")
+        else:
+            # Show loading state
+            rating_container.markdown(
+                render_rating_card("loading"),
+                unsafe_allow_html=True,
             )
-            submitted = st.form_submit_button("Predict Rating", use_container_width=True)
 
-        if submitted:
-            if not overview.strip():
-                st.error("Plot overview is required!")
-            elif not genres:
-                st.error("Select at least one genre!")
-            else:
-                with st.spinner("Predicting..."):
+            try:
+                result = predict_rating(year, runtime, genres, overview, budget, is_adult)
+                rating = result["predicted_rating"]
+
+                # Store in session state and show result
+                st.session_state.rating = rating
+                st.session_state.show_result = True
+
+                rating_container.markdown(
+                    render_rating_card("result", rating),
+                    unsafe_allow_html=True,
+                )
+
+            except requests.HTTPError as e:
+                rating_container.markdown(
+                    render_rating_card("error"),
+                    unsafe_allow_html=True,
+                )
+                st.error(f"API Error: {e.response.text}")
+                return
+            except requests.RequestException as e:
+                rating_container.markdown(
+                    render_rating_card("error"),
+                    unsafe_allow_html=True,
+                )
+                st.error(f"Connection failed: {e}")
+                return
+
+            # Similar movies - automatically after rating
+            with similar_container:
+                with st.spinner("Finding similar movies..."):
                     try:
-                        result = predict_rating(year, runtime, genres, overview, budget, is_adult)
-                        rating = result["predicted_rating"]
+                        result = search_similar_films(overview, k=5)
 
-                        # Display result with color coding
-                        if rating >= 7:
-                            st.success(f"### Predicted Rating: **{rating:.1f}**/10 🌟")
-                        elif rating >= 5:
-                            st.warning(f"### Predicted Rating: **{rating:.1f}**/10")
-                        else:
-                            st.error(f"### Predicted Rating: **{rating:.1f}**/10")
+                        if result["results"]:
+                            st.subheader("Similar Movies")
+                            for movie in result["results"]:
+                                title = movie.get("title", "Unknown")
+                                vote = movie.get("vote_average", 0)
+                                movie_overview = movie.get("overview", "")
+                                display_overview = ""
+                                if movie_overview:
+                                    display_overview = movie_overview[:200] + "..." if len(movie_overview) > 200 else movie_overview
+
+                                st.markdown(
+                                    f"""
+                                    <div class="movie-card">
+                                        <strong>{title}</strong> — ⭐ {vote:.1f}
+                                        <br><small style="color: #666;">{display_overview}</small>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
 
                     except requests.HTTPError as e:
-                        st.error(f"API Error: {e.response.text}")
+                        error_detail = e.response.json().get("detail", str(e))
+                        st.warning(f"Similar movies unavailable: {error_detail}")
                     except requests.RequestException as e:
-                        st.error(f"Connection failed: {e}")
-
-    # Tab 2: Similar Films Search
-    with tab2:
-        st.header("Find Similar Films")
-        st.caption("Search by title, plot description, genre, actor, or any combination")
-
-        query = st.text_input(
-            "Search Query",
-            placeholder="e.g., 'dark sci-fi thriller with AI' or 'movies like Inception'"
-        )
-        num_results = st.slider("Number of results", 1, 20, 10)
-
-        if st.button("Search", use_container_width=True) and query.strip():
-            with st.spinner("Searching..."):
-                try:
-                    result = search_similar_films(query, num_results)
-
-                    if result["results"]:
-                        st.write(f"Found {result['count']} similar films:")
-
-                        for i, movie in enumerate(result["results"], 1):
-                            with st.expander(
-                                f"**{i}. {movie['title']}** - ⭐ {movie['vote_average']:.1f}"
-                            ):
-                                st.write(f"**Genres:** {movie['genres']}")
-                                st.write(f"**Directors:** {movie['directors']}")
-                                st.write(f"**Cast:** {movie['cast']}")
-                                st.write(f"**Overview:** {movie['overview']}")
-                                st.caption(f"IMDB: {movie['imdb_id']} | Similarity: {movie['score']:.3f}")
-                    else:
-                        st.info("No results found. Try a different query.")
-
-                except requests.HTTPError as e:
-                    error_detail = e.response.json().get("detail", str(e))
-                    st.error(f"Search failed: {error_detail}")
-                except requests.RequestException as e:
-                    st.error(f"Connection failed: {e}")
+                        st.warning(f"Could not find similar movies: {e}")
 
 
 if __name__ == "__main__":

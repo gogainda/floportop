@@ -1,0 +1,161 @@
+/* ============================================
+   PREDICT BUTTON
+   ============================================ */
+
+/* Target the Streamlit form submit button */
+div.stForm button[kind="primaryFormSubmit"],
+div.stForm button[type="submit"] {
+    width: 100%;
+    padding: 0.8rem 2rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3);
+    margin-top: 1rem;
+}
+
+div.stForm button[kind="primaryFormSubmit"]:hover,
+div.stForm button[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(30, 58, 95, 0.4);
+    background: linear-gradient(135deg, #2d5a87 0%, #3d7ab7 100%);
+}
+
+div.stForm button[kind="primaryFormSubmit"]:active,
+div.stForm button[type="submit"]:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3);
+}
+
+/* ============================================
+   RATING CARD
+   ============================================ */
+
+.rating-card {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    margin: 1rem 0;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.rating-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.35);
+}
+
+/* Placeholder state */
+.rating-card.placeholder h2 {
+    color: #a0c4e8;
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* Loading state */
+.rating-card.loading h2 {
+    color: #a0c4e8;
+    font-size: 1.3rem;
+    margin: 0;
+    animation: fadeInOut 1.5s ease-in-out infinite;
+}
+
+/* Result state - single pop animation */
+.rating-card.result {
+    animation: popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.rating-card.result h1 {
+    color: #ffffff;
+    font-size: 3rem;
+    margin: 0;
+}
+
+.rating-card.result p {
+    color: #a0c4e8;
+    font-size: 1rem;
+    margin-top: 0.3rem;
+    margin-bottom: 0;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Pop in animation - runs once */
+@keyframes popIn {
+    0% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Fade in/out for loading */
+@keyframes fadeInOut {
+    0%, 100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+/* ============================================
+   SIMILAR MOVIES CARDS
+   ============================================ */
+
+.movie-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-left: 4px solid #2d5a87;
+    transition: all 0.25s ease;
+    cursor: default;
+}
+
+.movie-card:hover {
+    transform: translateX(8px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    background: #ffffff;
+    border-left-color: #1e3a5f;
+}
+
+/* ============================================
+   FORM INPUTS - subtle hover effects
+   ============================================ */
+
+div.stNumberInput > div > div > input:hover,
+div.stTextArea textarea:hover {
+    border-color: #2d5a87 !important;
+    box-shadow: 0 0 0 1px rgba(45, 90, 135, 0.2);
+}
+
+div.stNumberInput > div > div > input:focus,
+div.stTextArea textarea:focus {
+    border-color: #1e3a5f !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 95, 0.25) !important;
+}
+
+/* Multiselect hover */
+div.stMultiSelect > div > div:hover {
+    border-color: #2d5a87 !important;
+}
