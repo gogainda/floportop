@@ -7,9 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy model files and download FAISS index from GCS
+# Copy model files and download large files from GCS
 COPY models/ models/
-RUN curl -f -o models/index.faiss https://storage.googleapis.com/floportop-models/index.faiss
+RUN curl -f -o models/index.faiss https://storage.googleapis.com/wagon-01-models/index.faiss && \
+    curl -f -o models/movies.pkl https://storage.googleapis.com/wagon-01-models/movies.pkl
 
 # Copy cached embedding model (used by movie_search.py)
 COPY cache/model cache/model
