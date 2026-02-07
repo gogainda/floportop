@@ -2,23 +2,29 @@
 Floportop API - Movie Rating Prediction
 
 Endpoints:
-- GET /              : Health check
+- GET /              : HTML + jQuery frontend
+- GET /health        : Health check
 - GET /predict       : Predict movie rating
 - GET /similar-film  : Find similar movies by text query
 - POST /rebuild-index : Rebuild the search index
 """
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from typing import Optional
 
 
 # Import our package
-import numpy as np
 import sys
 from pathlib import Path
 
-# Add parent directory to path so we can import floportop package
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project roots for local runs (repo root + src).
+APP_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = APP_ROOT / "src"
+FRONTEND_WEB_DIR = APP_ROOT / "apps" / "frontend" / "web"
+sys.path.insert(0, str(APP_ROOT))
+sys.path.insert(0, str(SRC_ROOT))
 
 from floportop import predict_movie, load_model
 from floportop.preprocessing import load_embedding_model
@@ -30,6 +36,9 @@ app = FastAPI(
     description="Predict IMDb movie ratings using machine learning",
     version="5.0.0"
 )
+
+if FRONTEND_WEB_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_WEB_DIR)), name="static")
 
 
 @app.on_event("startup")
@@ -70,10 +79,35 @@ def startup_event():
     print("🏁 API ready and resources cached")
 
 
-@app.get("/")
-def root():
+@app.get("/health")
+def health():
     """Health check endpoint."""
     return {"status": "online", "model_version": "v5"}
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    """Serve frontend single-page app."""
+    index_file = FRONTEND_WEB_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"status": "online", "model_version": "v5"}
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots():
+    robots_file = FRONTEND_WEB_DIR / "robots.txt"
+    if robots_file.exists():
+        return FileResponse(robots_file, media_type="text/plain")
+    return "User-agent: *\nAllow: /\n"
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap():
+    sitemap_file = FRONTEND_WEB_DIR / "sitemap.xml"
+    if sitemap_file.exists():
+        return FileResponse(sitemap_file, media_type="application/xml")
+    return '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>'
 
 
 @app.get("/predict")

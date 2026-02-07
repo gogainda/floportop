@@ -1,0 +1,11 @@
+<svg width="400" height="120" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="120" fill="white"/>
+
+  <!-- Main text "FLOP OR TOP" in bold grotesk style -->
+  <text x="200" y="70" text-anchor="middle" font-family="Arial Black, Helvetica, sans-serif" font-size="42" font-weight="900" fill="#DC2626" letter-spacing="2">
+    FLOP OR TOP
+  </text>
+
+  <!-- Underline accent -->
+  <rect x="50" y="85" width="300" height="4" fill="#DC2626"/>
+</svg>

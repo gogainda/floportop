@@ -10,7 +10,6 @@ pandas
 faiss-cpu
 sentence-transformers
 scikit-learn
-xgboost
 
 #UI
 streamlit>=1.30.0

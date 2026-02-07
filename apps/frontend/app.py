@@ -171,30 +171,8 @@ def render_bento_complete(rating, movies):
 </div>'''
 
 
-# ============================================
-# Main App
-# ============================================
-
-def main():
-    # Header pill
-    st.markdown('''<div class="header-pill">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-        Flop or Top
-    </div>''', unsafe_allow_html=True)
-
-    # API status indicator in sidebar
-    api_online = check_api_health()
-    if api_online:
-        st.sidebar.success("API Online")
-    else:
-        st.sidebar.warning("API may be cold starting...")
-        st.sidebar.caption(f"URL: {API_URL}")
-
+def render_prediction_page():
+    """Render the prediction UI and results."""
     # Initialize session state
     if "rating" not in st.session_state:
         st.session_state.rating = None
@@ -205,38 +183,30 @@ def main():
 
     # Form
     with st.form("movie_form"):
-        # Plot Overview first
         overview = st.text_area(
             "Plot Overview",
             placeholder="Describe the movie plot...",
             height=120
         )
 
-        # Budget and Year
         col1, col2 = st.columns(2)
         with col1:
             budget = st.number_input("Budget (USD)", 0, 500_000_000, 0)
         with col2:
             year = st.number_input("Release Year", 1900, 2030, 2024)
 
-        # Runtime and Genre
         col3, col4 = st.columns(2)
         with col3:
             runtime = st.number_input("Runtime (minutes)", 1, 500, 120)
         with col4:
             genres = st.multiselect("Genre", AVAILABLE_GENRES, ["Drama"])
 
-        # Adult content
         is_adult = st.checkbox("Adult Content (18+)")
-
         submitted = st.form_submit_button("Predict Rating", use_container_width=True)
 
-    # Results container
     results_container = st.empty()
 
-    # Show existing results or placeholder
     if st.session_state.show_result and st.session_state.rating is not None:
-        # Re-render previous results
         if st.session_state.similar_movies:
             results_container.markdown(
                 render_bento_complete(st.session_state.rating, st.session_state.similar_movies),
@@ -251,25 +221,19 @@ def main():
         results_container.markdown(render_full_bar_placeholder(), unsafe_allow_html=True)
 
     if submitted:
-        print(f"DEBUG: Form submitted! overview={overview[:50] if overview else 'EMPTY'}..., genres={genres}")
         if not overview.strip():
             st.error("Plot overview is required!")
         elif not genres:
             st.error("Select at least one genre!")
         else:
             try:
-                # Get rating prediction
-                print(f"DEBUG: Calling predict_rating API...")
                 with st.spinner("Predicting rating..."):
                     result = predict_rating(year, runtime, genres, overview, budget, is_adult)
-                print(f"DEBUG: Got result: {result}")
                 rating = result["predicted_rating"]
 
-                # Store in session state
                 st.session_state.rating = rating
                 st.session_state.show_result = True
 
-                # Fetch similar movies (separate try so prediction still shows on failure)
                 try:
                     similar_result = search_similar_films(overview, k=5)
                     st.session_state.similar_movies = similar_result.get("results", [])
@@ -303,6 +267,86 @@ def main():
                 st.session_state.similar_movies = []
                 results_container.markdown(render_full_bar_placeholder(), unsafe_allow_html=True)
                 st.error(f"Error: {e}")
+
+
+def render_technical_page():
+    """Render technical details: data sources to serving."""
+    st.title("How The Model Is Built")
+    st.caption("From data collection to training to production serving.")
+
+    st.subheader("1) Data Sources")
+    st.markdown(
+        "- IMDb dataset: movie metadata and target ratings.\n"
+        "- TMDB movies dataset: plot overviews, keywords, cast, directors, and financial context.\n"
+        "- Optional Kaggle API pull for rebuilding similarity data locally."
+    )
+
+    st.subheader("2) Feature Engineering")
+    st.markdown(
+        "- Core metadata features: release year, runtime, genres, adult flag.\n"
+        "- Text understanding: movie overview embedded with `all-MiniLM-L6-v2`.\n"
+        "- Dimensionality reduction: embedding compressed via PCA (20 components).\n"
+        "- Budget handling: `log1p` transform with decade-based median imputation when missing."
+    )
+
+    st.subheader("3) Prediction Model")
+    st.markdown(
+        "- Regression model trained on historical labeled movies.\n"
+        "- Runtime API uses model artifact `models/model_v5.pkl`.\n"
+        "- The `/predict` endpoint returns the estimated IMDb-style score."
+    )
+
+    st.subheader("4) Similarity Engine")
+    st.markdown(
+        "- Search corpus includes enriched movie text built from overview, genres, cast, directors, and keywords.\n"
+        "- Embeddings are generated with `BAAI/bge-base-en-v1.5`.\n"
+        "- ANN search runs with FAISS index (`models/index.faiss`) and returns nearest titles."
+    )
+
+    st.subheader("5) Serving Architecture")
+    st.markdown(
+        "- FastAPI serves prediction and similarity endpoints on port `8080`.\n"
+        "- Streamlit UI runs on port `8501` and calls API over internal HTTP.\n"
+        "- Container startup script launches both services in one process group.\n"
+        "- Docker image bakes dependencies and model assets for predictable startup."
+    )
+
+    st.subheader("6) Production Deployment")
+    st.markdown(
+        "- Image is built with Docker and shipped to Cloud Run.\n"
+        "- Cloud Run exposes Streamlit publicly while API remains internal to the container.\n"
+        "- Health endpoint (`/`) is used for readiness and status checks."
+    )
+
+
+# ============================================
+# Main App
+# ============================================
+
+def main():
+    # Header pill
+    st.markdown('''<div class="header-pill">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        Flop or Top
+    </div>''', unsafe_allow_html=True)
+
+    # API status indicator in sidebar
+    api_online = check_api_health()
+    if api_online:
+        st.sidebar.success("API Online")
+    else:
+        st.sidebar.warning("API may be cold starting...")
+        st.sidebar.caption(f"URL: {API_URL}")
+    page = st.sidebar.radio("Page", ["Predict", "How It's Built"], index=0)
+    if page == "Predict":
+        render_prediction_page()
+    else:
+        render_technical_page()
 
 
 if __name__ == "__main__":
