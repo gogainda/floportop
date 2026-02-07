@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flop Or Top | Movie Rating Predictor</title>
+  <meta name="description" content="Predict movie ratings from plot and metadata, then discover similar films with semantic search." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="/" />
+  <meta name="theme-color" content="#0f172a" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Flop Or Top | Movie Rating Predictor" />
+  <meta property="og:description" content="Estimate IMDb-style ratings and find similar movies using ML and FAISS search." />
+  <meta property="og:image" content="/static/og-image.png" />
+  <meta property="og:url" content="/" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Flop Or Top | Movie Rating Predictor" />
+  <meta name="twitter:description" content="Predict movie ratings and discover related films with semantic retrieval." />
+  <meta name="twitter:image" content="/static/og-image.png" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Flop Or Top",
+    "applicationCategory": "EntertainmentApplication",
+    "description": "A web app that predicts movie ratings and retrieves similar films.",
+    "operatingSystem": "Web"
+  }
+  </script>
+
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gilda+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip To Main Content</a>
+
+  <header class="site-header">
+    <p class="eyebrow">Machine Learning Demo</p>
+    <h1 class="brand">Flop Or Top</h1>
+    <p class="subtitle">Predict movie ratings and find similar films.</p>
+  </header>
+
+  <main id="main-content" class="container">
+    <nav class="tabs" role="tablist" aria-label="App Pages">
+      <button id="tab-predict" class="tab active" role="tab" aria-selected="true" aria-controls="page-predict">Predict Rating</button>
+      <button id="tab-similar" class="tab" role="tab" aria-selected="false" aria-controls="page-similar">Find Similar Films</button>
+      <button id="tab-model" class="tab" role="tab" aria-selected="false" aria-controls="page-model">How Model Was Built</button>
+    </nav>
+
+    <section id="page-predict" class="page active" role="tabpanel" aria-labelledby="tab-predict">
+      <form id="predict-form" class="panel" novalidate>
+        <div class="grid two">
+          <div>
+            <label for="startYear">Release Year</label>
+            <div class="stepper">
+              <input id="startYear" name="startYear" type="number" min="1900" max="2030" value="2024" required />
+              <button type="button" class="step" data-target="#startYear" data-step="-1" aria-label="Decrease Release Year">−</button>
+              <button type="button" class="step" data-target="#startYear" data-step="1" aria-label="Increase Release Year">+</button>
+            </div>
+            <p class="field-error" id="error-startYear"></p>
+          </div>
+
+          <div>
+            <label for="budget">Budget (USD, Optional)</label>
+            <div class="stepper">
+              <input id="budget" name="budget" type="number" min="0" step="1000000" value="0" />
+              <button type="button" class="step" data-target="#budget" data-step="-1000000" aria-label="Decrease Budget">−</button>
+              <button type="button" class="step" data-target="#budget" data-step="1000000" aria-label="Increase Budget">+</button>
+            </div>
+            <p class="field-error" id="error-budget"></p>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div>
+            <label for="runtimeMinutes">Runtime (Minutes)</label>
+            <div class="stepper">
+              <input id="runtimeMinutes" name="runtimeMinutes" type="number" min="1" max="500" value="120" required />
+              <button type="button" class="step" data-target="#runtimeMinutes" data-step="-1" aria-label="Decrease Runtime">−</button>
+              <button type="button" class="step" data-target="#runtimeMinutes" data-step="1" aria-label="Increase Runtime">+</button>
+            </div>
+            <p class="field-error" id="error-runtimeMinutes"></p>
+          </div>
+
+          <div>
+            <label class="checkbox-line" for="isAdult">
+              <input id="isAdult" name="isAdult" type="checkbox" />
+              Adult Content (18+)
+            </label>
+          </div>
+        </div>
+
+        <label for="genres">Genres</label>
+        <select id="genres" name="genres" multiple></select>
+        <p class="field-error" id="error-genres"></p>
+
+        <label for="overview">Plot Overview</label>
+        <textarea id="overview" name="overview" rows="4" required placeholder="Describe the movie plot…"></textarea>
+        <p class="field-error" id="error-overview"></p>
+
+        <button type="submit" id="predict-btn">Predict Rating</button>
+      </form>
+
+      <section id="results" class="panel hidden" aria-live="polite">
+        <h3>Prediction Result</h3>
+        <p id="rating" class="rating">-</p>
+        <h4>Reference Films</h4>
+        <div id="similar-grid" class="cards"></div>
+      </section>
+    </section>
+
+    <section id="page-similar" class="page" role="tabpanel" aria-labelledby="tab-similar">
+      <h2>Find Similar Films</h2>
+      <p class="lede">Search by concept, mood, genre, or story premise.</p>
+
+      <div class="panel">
+        <label for="similar-query">Search Query</label>
+        <textarea id="similar-query" rows="4" placeholder="Dark sci-fi time travel thriller…"></textarea>
+        <p class="field-error" id="error-similar-query"></p>
+        <button id="similar-btn" type="button">Find Similar Films</button>
+        <div id="similar-only-grid" class="cards"></div>
+      </div>
+    </section>
+
+    <section id="page-model" class="page" role="tabpanel" aria-labelledby="tab-model">
+      <h2>How The Model Was Created</h2>
+      <p class="lede">From raw movie datasets to deployed prediction and similarity APIs.</p>
+
+      <article class="panel">
+        <h3>1) Data Sources and Targets</h3>
+        <p>
+          We combine IMDb and TMDB data. IMDb contributes structured metadata and rating labels (target variable).
+          TMDB contributes richer text fields such as plot overviews, keywords, cast, and directors.
+          This gives both supervised signal (rating) and contextual signal (story semantics).
+        </p>
+
+        <h3>2) Feature Engineering Pipeline</h3>
+        <p>
+          Structured features include release year, runtime, genre one-hot columns, adult flag, and budget features.
+          Budget is transformed with <code>log1p</code> and missing values are imputed with decade-level medians.
+          For text, overviews are embedded with <code>all-MiniLM-L6-v2</code>, then reduced with PCA to compact
+          components used by the prediction model. This keeps semantic signal while controlling feature size.
+        </p>
+
+        <h3>3) Chosen Prediction Model</h3>
+        <p>
+          The production artifact is <code>model_v5.pkl</code>. It predicts IMDb-style scores from engineered features.
+          We selected this setup after iterating across experiments to balance quality, interpretability, and inference speed.
+          The API endpoint <code>/predict</code> runs preprocessing + inference and returns a rounded score.
+        </p>
+
+        <h3>4) Similarity Search Model</h3>
+        <p>
+          Similar-film retrieval uses sentence embeddings from <code>BAAI/bge-base-en-v1.5</code>.
+          Enriched movie text is embedded and indexed using FAISS (<code>index.faiss</code>).
+          Query embeddings are searched by nearest neighbors and returned through <code>/similar-film</code>.
+        </p>
+
+        <h3>5) Serving and Deployment</h3>
+        <p>
+          FastAPI serves both the UI and API routes in one container. Model files are prepared during Docker build,
+          including large artifacts fetched from cloud storage. At runtime, the app starts once and exposes a health
+          endpoint plus prediction and similarity endpoints, ready for Cloud Run deployment.
+        </p>
+      </article>
+    </section>
+  </main>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

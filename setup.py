@@ -20,23 +20,29 @@ def download_index():
     urllib.request.urlretrieve(url, index_path)
     print(f"Downloaded to {index_path}")
 
-requirements = []
-
-if os.path.isfile('requirements.txt'):
-    with open('requirements.txt') as f:
+def read_requirements(path: str) -> list[str]:
+    if not os.path.isfile(path):
+        return []
+    with open(path) as f:
         content = f.readlines()
-    requirements.extend([x.strip() for x in content if 'git+' not in x])
+    return [
+        line.strip()
+        for line in content
+        if line.strip() and not line.startswith("#") and "git+" not in line
+    ]
 
-if os.path.isfile('requirements_dev.txt'):
-    with open('requirements_dev.txt') as f:
-        content = f.readlines()
-    requirements.extend([x.strip() for x in content if 'git+' not in x])
+
+requirements = (
+    read_requirements("requirements/prod.lock")
+    or read_requirements("requirements.txt")
+)
 
 
 setup(name='floportop',
       version="0.0.1",
       description="Movie prediction engine",
-      packages=find_packages(),
+      packages=find_packages(where="src"),
+      package_dir={"": "src"},
       install_requires=requirements,
       # include_package_data: to install data from MANIFEST.in
       include_package_data=True,

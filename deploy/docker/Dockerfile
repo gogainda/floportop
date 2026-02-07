@@ -2,57 +2,53 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy model files (pkl, json) and download large files from GCS
-COPY models/ models/
-RUN curl -f -o models/index.faiss https://storage.googleapis.com/floportop-models/index.faiss && \
-    curl -f -o models/movies.pkl https://storage.googleapis.com/floportop-models/movies.pkl
-
-# Install Python dependencies from locked versions (CPU-only torch)
-# Single layer for better Kaniko caching
-COPY requirements-prod.lock .
+# Install Python dependencies first for better layer reuse.
+COPY requirements/prod.lock requirements/prod.lock
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements-prod.lock
+    pip install --no-cache-dir -r requirements/prod.lock
 
-# Pre-download embedding models (avoids HuggingFace rate limits at runtime)
+# Pre-download embedding models to avoid runtime cold-start downloads.
 RUN mkdir -p cache/search_model cache/prediction_model && \
     python -c "from sentence_transformers import SentenceTransformer; \
                m1 = SentenceTransformer('BAAI/bge-base-en-v1.5'); m1.save('cache/search_model'); \
                m2 = SentenceTransformer('all-MiniLM-L6-v2'); m2.save('cache/prediction_model');"
 
-# --- Runtime stage ---
+# Copy versioned model artifacts and fetch large binary artifacts from GCS.
+COPY models/ models/
+RUN curl -f -o models/index.faiss https://storage.googleapis.com/floportop-models/index.faiss && \
+    curl -f -o models/movies.pkl https://storage.googleapis.com/floportop-models/movies.pkl
+
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libomp-dev \
+    libgomp1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from builder
+# Runtime Python deps and entrypoints.
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy models from builder (pkl, json, faiss)
+# Runtime artifacts prepared in builder.
 COPY --from=builder /app/models /app/models
-
-# Copy embedding models from builder
 COPY --from=builder /app/cache /app/cache
 
-# Copy application code
-COPY . .
+# Runtime application source only.
+COPY apps/api/ apps/api/
+COPY apps/frontend/ apps/frontend/
+COPY src/floportop/ src/floportop/
+COPY start.sh start.sh
+
+ENV API_URL=http://localhost:8080
+ENV PYTHONUNBUFFERED=1
+
+RUN chmod +x /app/start.sh
 
 EXPOSE 8080 8501
-
-# Set API URL for internal communication
-ENV API_URL="http://localhost:8080"
-
-RUN chmod +x start.sh
-
-CMD ["./start.sh"]
+CMD ["/app/start.sh"]

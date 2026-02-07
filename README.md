@@ -1,5 +1,7 @@
 # Will This Movie Be Good?
 
+![Flop Or Top Logo](logos/logo_3.png)
+
 A machine learning tool that predicts a movie's IMDb rating from its metadata and plot description — with the ability to suggest similar existing movies for reference.
 
 ## The Problem
@@ -91,26 +93,31 @@ See `notebooks/jesus/model_v4.ipynb` for full experiment results.
 
 ## Project Structure
 
-```
+```text
 floportop/
-├── data/                    # Datasets (not tracked in git)
-│   ├── raw/                 # Original Kaggle files (IMDb + TMDB)
-│   ├── processed/           # Clean merged datasets
-│   ├── embeddings/          # Plot embeddings
-│   └── v1/                  # Legacy intermediate files
-├── notebooks/
-│   ├── jesus/               # Main data pipeline
-│   │   ├── data_pipeline.ipynb        # IMDb + TMDB cleaning & merging
-│   │   ├── feature_engineering.ipynb  # Feature creation for modeling
-│   │   └── v1/              # Previous notebook versions
-│   └── ...                  # Other team members' notebooks
-├── floportop/               # Source code (prediction & search)
-├── api/                     # FastAPI endpoints
-├── frontend/                # Streamlit UI (calls API via HTTP)
-├── models/                  # Trained models & FAISS index
-├── requirements.txt         # Full dependencies (dev + prod)
-├── requirements-prod.txt    # Production only (slim Docker)
-├── Dockerfile               # Multi-stage build, CPU-only PyTorch
+├── apps/
+│   ├── api/                 # FastAPI app
+│   └── frontend/            # Streamlit app
+├── src/
+│   └── floportop/           # Shared prediction/search package
+├── deploy/
+│   ├── cloudbuild.yaml      # Google Cloud Build config
+│   └── docker/
+│       ├── Dockerfile
+│       └── .dockerignore
+├── requirements/
+│   ├── prod.in
+│   ├── prod.lock
+│   └── dev.txt
+├── models/                  # Trained model artifacts
+├── cache/                   # Runtime model caches
+├── data/                    # Local datasets (not in production image)
+├── notebooks/               # Training and exploration notebooks
+├── scripts/                 # Data and notebook helpers
+├── docs/
+│   └── restructure-plan.md
+├── Makefile
+├── start.sh
 └── README.md
 ```
 ## API
@@ -119,8 +126,7 @@ floportop/
 
 ```bash
 pip install -e .
-cd api
-uvicorn app:app --reload
+PYTHONPATH=src:. uvicorn apps.api.app:app --reload
 ```
 
 The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
@@ -152,12 +158,12 @@ curl "http://localhost:8000/predict?startYear=2024&runtimeMinutes=148&genres=Act
 curl "http://localhost:8000/similar-film?query=dark+sci-fi+time+travel&k=5"
 ```
 
-Note: The similarity search index is built lazily on the first `/similar-film` call. Subsequent calls use the cached index from `api/cache/`.
+Note: The similarity search index is built lazily on the first `/similar-film` call. Subsequent calls use the cached index from `cache/`.
 
 ## Search engine CLI
 
 ```bash
-python -m floportop.movie_search "dark sci-fi time travel"
+PYTHONPATH=src:. python -m floportop.movie_search "dark sci-fi time travel"
 ```
 
 ## Team
@@ -229,7 +235,7 @@ Verification: Run docker inspect [IMAGE_NAME] | grep Architecture.The Fix: Re-ru
 
 ```bash
 # Build optimized image (CPU-only, ~1.8GB)
-docker build -t floportop .
+docker build -f deploy/docker/Dockerfile -t floportop .
 
 # Run locally (exposes both API and Streamlit UI)
 docker run -p 8080:8080 -p 8501:8501 floportop
