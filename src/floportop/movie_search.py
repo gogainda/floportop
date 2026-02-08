@@ -12,6 +12,7 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 
+from .paths import APP_ROOT, CACHE_DIR, DATA_DIR, MODELS_DIR
 
 warnings.filterwarnings("ignore", message="Columns.*mixed types")
 
@@ -20,11 +21,7 @@ warnings.filterwarnings("ignore", message="Columns.*mixed types")
 # Configuration
 # ============================================================================
 
-PROJECT_ROOT = Path(__file__).parent.parent
-
-CACHE_DIR = PROJECT_ROOT / "cache"
-DATA_DIR = PROJECT_ROOT / "data"
-MODELS_DIR = PROJECT_ROOT / "models"
+PROJECT_ROOT = APP_ROOT
 
 MOVIES_PKL = MODELS_DIR / "movies.pkl"
 INDEX_FAISS = MODELS_DIR / "index.faiss"
@@ -90,7 +87,7 @@ def join_list(lst):
 
 def merge_plot_arcs(df):
     """Merge plot arc data from parquet file"""
-    plot_arc_path = PROJECT_ROOT / "models" / "wide_df_with_plot_arc.parquet"
+    plot_arc_path = MODELS_DIR / "wide_df_with_plot_arc.parquet"
 
     if not plot_arc_path.exists():
         print("⚠️  Plot arc file not found, skipping plot arcs")

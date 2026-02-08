@@ -3,15 +3,18 @@ GCP_PROJECT_ID ?= $(shell gcloud config get-value project 2>/dev/null)
 DOCKER_IMAGE_NAME ?= floportop-v2
 REGION ?= europe-west1
 
-.PHONY: install run_api check_gcp gcp_build gcp_deploy gcp_ship
+.PHONY: install run_api docker_build check_gcp gcp_build gcp_deploy gcp_ship
 
 # --- Local Commands ---
 
 install:
-	pip install -r requirements.txt
+	pip install -r requirements/dev.txt
 
 run_api:
-	uvicorn api.app:app --reload
+	PYTHONPATH=src:. uvicorn apps.api.app:app --reload
+
+docker_build:
+	docker build -f deploy/docker/Dockerfile -t floportop:local .
 
 # --- Google Cloud Commands ---
 
@@ -21,7 +24,7 @@ check_gcp:
 
 # 1. Build the image on Google Cloud (uses Kaniko layer caching)
 gcp_build: check_gcp
-	gcloud builds submit --project $(GCP_PROJECT_ID) --config cloudbuild.yaml .
+	gcloud builds submit --project $(GCP_PROJECT_ID) --config deploy/cloudbuild.yaml .
 
 # 2. Deploy the image to a live URL
 gcp_deploy: check_gcp

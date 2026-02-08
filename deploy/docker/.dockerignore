@@ -1,0 +1,26 @@
+# Default deny-all; include only runtime build inputs.
+*
+
+# Build metadata.
+!Dockerfile
+!.dockerignore
+
+# Dependency lockfiles.
+!requirements/
+!requirements/prod.lock
+
+# Runtime application source.
+!apps/
+!apps/**
+!src/
+!src/**
+!start.sh
+
+# Model artifacts required at runtime.
+!models/
+!models/**
+
+# Exclude large artifacts that are fetched during image build.
+models/*.faiss
+models/movies.pkl
+models/*.parquet
