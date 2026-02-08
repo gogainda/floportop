@@ -82,14 +82,9 @@ All inputs are available before release — making predictions realistic and use
 
 See `notebooks/jesus/model_v4.ipynb` for full experiment results.
 
-## Tech Stack
+## Tools & Models
 
-- Python 3.12
-- pandas / numpy
-- scikit-learn (GradientBoostingRegressor)
-- sentence-transformers (plot embeddings)
-- FastAPI (REST API)
-- Streamlit (demo UI)
+Python 3.12 · pandas · NumPy · scikit-learn · GradientBoostingRegressor · sentence-transformers · all-MiniLM-L6-v2 · BAAI/bge-base-en-v1.5 · FAISS · FastAPI · jQuery · Select2 · Docker · Fly.io · Google Cloud Storage
 
 ## Project Structure
 
