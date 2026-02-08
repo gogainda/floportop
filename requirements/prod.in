@@ -1,0 +1,16 @@
+# API
+fastapi
+uvicorn
+
+# Data processing
+numpy
+pandas
+
+# ML/Search
+faiss-cpu
+sentence-transformers
+scikit-learn
+
+#UI
+streamlit>=1.30.0
+requests

@@ -12,22 +12,32 @@ venv/
 .venv/
 .env
 
+# Large ML artifacts (downloaded at runtime or from GCS)
+cache/
+models/*.parquet
+models/*.faiss
+*.faiss
+*.bin
+*.pt
+*.pth
+
 # Jupyter & Data
 .ipynb_checkpoints
 data/
 notebooks/
-models/*.parquet
 
 # Mac/System junk
 .DS_Store
 Thumbs.db
 
-# Deployment artifacts (keep Dockerfile for gcloud builds)
+# Deployment artifacts
 .dockerignore
 .gcloudignore
 
 # Dev files not needed in production
 requirements_dev.txt
+requirements.txt
+requirements/dev.txt
 Makefile
 README.md
 scripts/
@@ -36,3 +46,5 @@ scripts/
 .envrc
 .python-version
 setup.py
+.vscode/
+.idea/
