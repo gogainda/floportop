@@ -137,6 +137,7 @@ async function runPrediction(event) {
     } catch (_err) {
       renderCards("#similar-grid", []);
     }
+    document.getElementById("results").scrollIntoView({ behavior: "smooth", block: "end" });
   } catch (err) {
     const message = err?.responseJSON?.detail || "Prediction failed. Please try again.";
     showError("overview", message);

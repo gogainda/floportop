@@ -300,6 +300,24 @@ textarea { transition: background-color 160ms ease, border-color 160ms ease, box
   .checkbox-line { margin-top: 6px; }
 }
 
+.site-footer {
+  max-width: 980px;
+  margin: 32px auto 24px;
+  padding: 16px 24px 0;
+  border-top: 1px solid #334155;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.site-footer a {
+  color: #94a3b8;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: #e2e8f0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
