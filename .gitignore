@@ -44,6 +44,9 @@ data/
 secrets.toml
 *.json
 
+# Fly.io
+fly.toml
+
 # User defined extras
 # Complete to your desire
 *.tsv

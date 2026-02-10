@@ -1,22 +1,43 @@
-# Version Control
-.git
-.gitignore
+# Default deny-all; include only runtime build inputs.
+*
 
-# Python junk
-__pycache__/
-*.py[cod]
-*.class
-*.so
-.pytest_cache/
-venv/
-.venv/
-.env
+# Build metadata.
+!.dockerignore
+!deploy/
+!deploy/docker/
+!deploy/docker/Dockerfile
+
+# Dependency lockfiles.
+!requirements/
+!requirements/prod.lock
+
+# Runtime application source.
+!apps/
+!apps/**
+!src/
+!src/**
+!start.sh
+
+# Model artifacts required at runtime.
+!models/
+!models/**
+
+# Exclude large artifacts that are fetched during image build.
+models/*.faiss
+models/movies.pkl
+models/*.parquet
+
+# Large ML artifacts (downloaded at runtime or from GCS)
+cache/
+*.faiss
+*.bin
+*.pt
+*.pth
 
 # Jupyter & Data
 .ipynb_checkpoints
 data/
 notebooks/
-models/*.parquet
 
 # Mac/System junk
 .DS_Store
@@ -28,6 +49,7 @@ Dockerfile
 
 # Dev files not needed in production
 requirements_dev.txt
+requirements.txt
 Makefile
 README.md
 scripts/
@@ -36,3 +58,5 @@ scripts/
 .envrc
 .python-version
 setup.py
+.vscode/
+.idea/

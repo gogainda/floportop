@@ -1,5 +1,7 @@
 # Will This Movie Be Good?
 
+![Flop Or Top Logo](logos/logo_3.png)
+
 A machine learning tool that predicts a movie's IMDb rating from its metadata and plot description — with the ability to suggest similar existing movies for reference.
 
 ## The Problem
@@ -80,18 +82,13 @@ All inputs are available before release — making predictions realistic and use
 
 See `notebooks/03_model_training.ipynb` for full experiment results.
 
-## Tech Stack
+## Tools & Models
 
-- Python 3.12
-- pandas / numpy
-- scikit-learn (GradientBoostingRegressor)
-- sentence-transformers (plot embeddings)
-- FastAPI (REST API)
-- Streamlit (demo UI)
+Python 3.12 · pandas · NumPy · scikit-learn · GradientBoostingRegressor · sentence-transformers · all-MiniLM-L6-v2 · BAAI/bge-base-en-v1.5 · FAISS · FastAPI · jQuery · Select2 · Docker · Fly.io · Google Cloud Storage
 
 ## Project Structure
 
-```
+```text
 floportop/
 ├── apps/
 │   ├── api/                 # FastAPI app
@@ -128,8 +125,7 @@ floportop/
 
 ```bash
 pip install -e .
-cd api
-uvicorn app:app --reload
+PYTHONPATH=src:. uvicorn apps.api.app:app --reload
 ```
 
 The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
@@ -161,12 +157,12 @@ curl "http://localhost:8000/predict?startYear=2024&runtimeMinutes=148&genres=Act
 curl "http://localhost:8000/similar-film?query=dark+sci-fi+time+travel&k=5"
 ```
 
-Note: The similarity search index is built lazily on the first `/similar-film` call. Subsequent calls use the cached index from `api/cache/`.
+Note: The similarity search index is built lazily on the first `/similar-film` call. Subsequent calls use the cached index from `cache/`.
 
 ## Search engine CLI
 
 ```bash
-python -m floportop.movie_search "dark sci-fi time travel"
+PYTHONPATH=src:. python -m floportop.movie_search "dark sci-fi time travel"
 ```
 
 ## Team
@@ -238,7 +234,7 @@ Verification: Run docker inspect [IMAGE_NAME] | grep Architecture.The Fix: Re-ru
 
 ```bash
 # Build optimized image (CPU-only, ~1.8GB)
-docker build -t floportop .
+docker build -f deploy/docker/Dockerfile -t floportop .
 
 # Run locally (exposes both API and Streamlit UI)
 docker run -p 8080:8080 -p 8501:8501 floportop

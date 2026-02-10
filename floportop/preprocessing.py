@@ -49,6 +49,8 @@ FEATURE_ORDER_V5 = [
 
 # Paths to model artifacts
 MODELS_DIR = Path(__file__).parent.parent / "models"
+CACHE_DIR = Path(__file__).parent.parent / "cache"
+PREDICTION_MODEL_DIR = CACHE_DIR / "prediction_model"
 PCA_PATH = MODELS_DIR / "pca_transformer.pkl"
 BUDGET_MEDIANS_PATH = MODELS_DIR / "budget_medians.json"
 
@@ -73,7 +75,10 @@ def load_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        if PREDICTION_MODEL_DIR.exists():
+            _embedding_model = SentenceTransformer(str(PREDICTION_MODEL_DIR))
+        else:
+            _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     return _embedding_model
 
 

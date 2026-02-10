@@ -1,0 +1,17 @@
+<svg width="400" height="140" viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="140" fill="white"/>
+
+  <!-- Stacked layout with "FLOP" and "TOP" emphasized -->
+  <text x="200" y="55" text-anchor="middle" font-family="Arial Black, Helvetica, sans-serif" font-size="48" font-weight="900" fill="#DC2626" letter-spacing="3">
+    FLOP
+  </text>
+
+  <!-- "or" in smaller, lighter weight -->
+  <text x="200" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#6B7280" letter-spacing="4">
+    OR
+  </text>
+
+  <text x="200" y="120" text-anchor="middle" font-family="Arial Black, Helvetica, sans-serif" font-size="48" font-weight="900" fill="#DC2626" letter-spacing="3">
+    TOP
+  </text>
+</svg>
