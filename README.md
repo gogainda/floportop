@@ -80,7 +80,7 @@ All inputs are available before release — making predictions realistic and use
 | Algorithm | GradientBoosting | Best performer across 18 experiments |
 | Features | 49 | IMDb metadata + 20 PCA components from plot embeddings |
 
-See `notebooks/jesus/model_v4.ipynb` for full experiment results.
+See `notebooks/03_model_training.ipynb` for full experiment results.
 
 ## Tools & Models
 
@@ -107,7 +107,11 @@ floportop/
 ├── models/                  # Trained model artifacts
 ├── cache/                   # Runtime model caches
 ├── data/                    # Local datasets (not in production image)
-├── notebooks/               # Training and exploration notebooks
+├── notebooks/
+│   ├── 01_data_pipeline.ipynb        # IMDb + TMDB → clean datasets
+│   ├── 02_feature_engineering.ipynb   # Embeddings, PCA, genre encoding → features
+│   ├── 03_model_training.ipynb       # 18 experiments → model v5
+│   └── archive/                      # Team explorations & earlier iterations
 ├── scripts/                 # Data and notebook helpers
 ├── docs/
 │   └── restructure-plan.md
