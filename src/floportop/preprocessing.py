@@ -9,12 +9,13 @@ import pickle
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from datetime import datetime, timezone
 from functools import lru_cache
 
 from .paths import MODELS_DIR, CACHE_DIR, DATA_DIR
 
 # Constants
-CURRENT_YEAR = 2026
+CURRENT_YEAR = datetime.now(timezone.utc).year
 RUNTIME_CAP = 300  # minutes
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 N_PCA_COMPONENTS = 20
