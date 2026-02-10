@@ -12,6 +12,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from functools import lru_cache
 
+from .paths import MODELS_DIR, CACHE_DIR, DATA_DIR
 
 # Constants
 CURRENT_YEAR = datetime.now(timezone.utc).year
@@ -48,7 +49,7 @@ FEATURE_ORDER_V5 = [
 ]
 
 # Paths to model artifacts
-MODELS_DIR = Path(__file__).parent.parent / "models"
+PREDICTION_MODEL_DIR = CACHE_DIR / "prediction_model"
 PCA_PATH = MODELS_DIR / "pca_transformer.pkl"
 BUDGET_MEDIANS_PATH = MODELS_DIR / "budget_medians.json"
 
@@ -73,7 +74,10 @@ def load_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        if PREDICTION_MODEL_DIR.exists():
+            _embedding_model = SentenceTransformer(str(PREDICTION_MODEL_DIR))
+        else:
+            _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     return _embedding_model
 
 
@@ -204,7 +208,7 @@ def load_clean_data(filepath: str = None) -> pd.DataFrame:
         DataFrame with clean movie data.
     """
     if filepath is None:
-        filepath = Path(__file__).parent.parent / "data" / "movies_clean.csv"
+        filepath = DATA_DIR / "movies_clean.csv"
 
     df = pd.read_csv(filepath)
     return df
